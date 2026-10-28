@@ -120,8 +120,7 @@ namespace Spellbound.GeoForge {
         ///     Deliberately NOT [ContextMenu] here: Unity's menu-command reflection can't resolve
         ///     a method declared on a generic type (even closed, e.g. MaterialSideTable&lt;FxData&gt;)
         ///     - every concrete subclass would log "Method X.Sync is generic and cannot be used for
-        ///     menu commands." at domain reload. MaterialSideTableEditor below exposes this as an
-        ///     Inspector button instead, which calls it as a normal method and isn't affected.
+        ///     menu commands." at domain reload.
         /// </summary>
         public override void Sync() {
             if (materialDatabase == null) {
@@ -176,80 +175,4 @@ namespace Spellbound.GeoForge {
         }
 #endif
     }
-
-#if UNITY_EDITOR
-    /// <summary>
-    ///     Applies to every MaterialSideTable subclass (editorForChildClasses: true) - one editor
-    ///     for FootstepMaterialTable, FxMaterialTable, whatever else gets added later. Exposes
-    ///     Sync/Validate as Inspector buttons rather than [ContextMenu], since ContextMenu can't
-    ///     resolve methods declared on a generic base type (see the comment on Sync() above).
-    /// </summary>
-    [CustomEditor(typeof(MaterialSideTableBase), true)]
-    public class MaterialSideTableEditor : Editor {
-        public override void OnInspectorGUI() {
-            DrawDefaultInspector();
-
-            var table = (MaterialSideTableBase)target;
-
-            EditorGUILayout.Space();
-
-            if (GUILayout.Button("Sync With Material Database")) {
-                table.Sync();
-                EditorUtility.SetDirty(table);
-            }
-
-            if (GUILayout.Button("Validate")) {
-                var problems = table.Validate();
-                if (problems.Count == 0)
-                    Debug.Log($"{table.name}: in sync.");
-                else
-                    Debug.LogError($"{table.name}:\n  " + string.Join("\n  ", problems), table);
-            }
-        }
-    }
-
-    /// <summary>
-    ///     Project-wide maintenance for every MaterialSideTable, regardless of TData. Run
-    ///     "Validate All" before committing after editing a material list; run "Sync All" to
-    ///     fix whatever it flags.
-    /// </summary>
-    public static class MaterialSideTableUtility {
-        [MenuItem("Spellbound/GeoForge/Validate All Material Side Tables")]
-        private static void ValidateAll() {
-            var tables = FindAllSideTables();
-            var anyProblems = false;
-
-            foreach (var table in tables) {
-                var problems = table.Validate();
-                if (problems.Count == 0) continue;
-
-                anyProblems = true;
-                Debug.LogError($"{table.name}:\n  " + string.Join("\n  ", problems), table);
-            }
-
-            if (!anyProblems) Debug.Log($"All {tables.Count} material side table(s) are in sync.");
-        }
-
-        [MenuItem("Spellbound/GeoForge/Sync All Material Side Tables")]
-        private static void SyncAll() {
-            var tables = FindAllSideTables();
-            foreach (var table in tables) table.Sync();
-
-            AssetDatabase.SaveAssets();
-            Debug.Log($"Synced {tables.Count} material side table(s).");
-        }
-
-        private static List<MaterialSideTableBase> FindAllSideTables() {
-            var result = new List<MaterialSideTableBase>();
-            var guids = AssetDatabase.FindAssets("t:MaterialSideTableBase");
-
-            foreach (var guid in guids) {
-                var asset = AssetDatabase.LoadAssetAtPath<MaterialSideTableBase>(AssetDatabase.GUIDToAssetPath(guid));
-                if (asset != null) result.Add(asset);
-            }
-
-            return result;
-        }
-    }
-#endif
 }
