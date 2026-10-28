@@ -24,5 +24,7 @@
 * Added a barycentric coordinate shader for rendering the intersection between different materials more accurately
 * Provided a scriptableobject type to swap in different profiles for how to handle rendering, and variations on the fundamental marching cubes algorithms.
 
+## \[Unreleased]
 
-
+* The material side table inspector left the runtime folder for GeoForge's first editor assembly, Spellbound.GeoForge.Editor, and is drawn in UI Toolkit: the table's own fields, then a Material Database card whose Sync and Validate buttons show the result in the inspector as well as on the console. The two Spellbound/GeoForge menu items moved with it. MaterialSideTableEditor and MaterialSideTableUtility are removed. The editor assembly needs a Spellbound.Core that holds the shared editor controls.
+* The first test assembly, Spellbound.GeoForge.Editor.Tests, with the inspector's edit-mode tests.
