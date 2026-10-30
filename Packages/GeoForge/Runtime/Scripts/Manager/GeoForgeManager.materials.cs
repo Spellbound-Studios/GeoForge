@@ -6,9 +6,6 @@ using UnityEngine;
 
 namespace Spellbound.GeoForge {
     public partial class GeoForgeManager {
-        // Judgment call, leaning private: unlike materialDatabase, nothing external should need
-        // to enumerate or mutate this list directly - GetMaterialData<TData> is the intended
-        // single entry point, same way octreePrefab stays private plumbing behind GetPooledObject.
         [SerializeField] private List<MaterialSideTableBase> sideTables = new();
 
         // Lazily built on first GetMaterialData call rather than in Awake() - same pattern

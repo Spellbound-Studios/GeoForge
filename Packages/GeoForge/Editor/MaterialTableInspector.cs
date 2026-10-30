@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using Spellbound.Core.Authoring;
 using Spellbound.Core.Controls.Editor;
 using Spellbound.Core.Logging;
 using UnityEditor;
@@ -34,6 +33,7 @@ namespace Spellbound.GeoForge.Materials.Editor {
         public override VisualElement CreateInspectorGUI() {
             var root = new VisualElement();
             root.AddToClassList(ClassName);
+            EditorLook.Dress(root);
             InspectorElement.FillDefaultInspector(root, serializedObject, this);
             root.Add(CreateDatabaseCard());
             return root;
@@ -85,12 +85,12 @@ namespace Spellbound.GeoForge.Materials.Editor {
 
             if (problems.Count == 0) {
                 _status.Title = InSyncText;
-                _status.Severity = FindingSeverity.Information;
+                _status.State = HeaderStates.Passed;
                 return;
             }
 
             _status.Title = OutOfSyncText + ": " + (problems.Count == 1 ? "1 problem" : problems.Count + " problems");
-            _status.Severity = FindingSeverity.Error;
+            _status.State = HeaderStates.Error;
 
             foreach (var problem in problems) {
                 var row = new Label(problem);

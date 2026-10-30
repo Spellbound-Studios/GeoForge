@@ -1,0 +1,164 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 962a194318bb7b84187df0fb809d7cf3, type: 3}
+  m_Name: GeoForge
+  m_EditorClassIdentifier: Spellbound.PackageCheck.Editor::Spellbound.PackageCheck.PackageLedger
+  waivers:
+  - rule: I2
+    revision: 1
+    subjects:
+    - package.json#7c5876ed
+    reason: The author address is the old organisation name; GeoForge#107 points
+      every link at Spellbound-Studios.
+    endsAt: 1.0.0
+    handle: pipeline
+  - rule: I5
+    revision: 1
+    subjects:
+    - Samples~/DiggingAHole/GeoForge.Sample1.asmdef#155bc061
+    - Samples~/MiningOreVeins/GeoForge.Sample2.asmdef#dba3e604
+    - Samples~/NetworkedSample/Scripts/Controller.cs#4fbc93cb
+    - Samples~/NetworkedSample/Scripts/NetworkedChunk.cs#2e956be5
+    - Samples~/NetworkedSample/Scripts/NetworkedVolume.cs#2e956be5
+    - Samples~/NetworkedSample/Scripts/Spellbound.Sample4.asmdef#f2458f4e
+    - Samples~/NetworkedSample/Scripts/Ui.cs#4fbc93cb
+    - Samples~/OrbitingPlanets/GeoForge.Sample3.asmdef#6a94119b
+    reason: The sample assemblies and namespaces carry their old names; they are
+      renamed when the samples take the line's sample shape.
+    endsAt: 1.0.0
+    handle: pipeline
+  - rule: D5
+    revision: 1
+    subjects:
+    - Runtime/SpellBound.GeoForge.asmdef#1faf009a
+    - Runtime/SpellBound.GeoForge.asmdef#3c62bc70
+    - Runtime/SpellBound.GeoForge.asmdef#5c4422fe
+    - Runtime/SpellBound.GeoForge.asmdef#9417d0ec
+    - Runtime/SpellBound.GeoForge.asmdef#974dd97c
+    - Runtime/SpellBound.GeoForge.asmdef#fc4e3b9d
+    - Samples~/DiggingAHole/GeoForge.Sample1.asmdef#1142d096
+    - Samples~/DiggingAHole/GeoForge.Sample1.asmdef#1faf009a
+    - Samples~/DiggingAHole/GeoForge.Sample1.asmdef#29ba2ec8
+    - Samples~/DiggingAHole/GeoForge.Sample1.asmdef#2dee8301
+    - Samples~/DiggingAHole/GeoForge.Sample1.asmdef#2f5ca63a
+    - Samples~/MiningOreVeins/GeoForge.Sample2.asmdef#1142d096
+    - Samples~/MiningOreVeins/GeoForge.Sample2.asmdef#1faf009a
+    - Samples~/MiningOreVeins/GeoForge.Sample2.asmdef#29ba2ec8
+    - Samples~/MiningOreVeins/GeoForge.Sample2.asmdef#2dee8301
+    - Samples~/MiningOreVeins/GeoForge.Sample2.asmdef#2f5ca63a
+    - Samples~/MiningOreVeins/GeoForge.Sample2.asmdef#3c62bc70
+    - Samples~/MiningOreVeins/GeoForge.Sample2.asmdef#974dd97c
+    - Samples~/NetworkedSample/Scripts/Spellbound.Sample4.asmdef#1142d096
+    - Samples~/NetworkedSample/Scripts/Spellbound.Sample4.asmdef#1948c7df
+    - Samples~/NetworkedSample/Scripts/Spellbound.Sample4.asmdef#1faf009a
+    - Samples~/NetworkedSample/Scripts/Spellbound.Sample4.asmdef#29ba2ec8
+    - Samples~/NetworkedSample/Scripts/Spellbound.Sample4.asmdef#2dee8301
+    - Samples~/NetworkedSample/Scripts/Spellbound.Sample4.asmdef#2f5ca63a
+    - Samples~/NetworkedSample/Scripts/Spellbound.Sample4.asmdef#3c62bc70
+    - Samples~/NetworkedSample/Scripts/Spellbound.Sample4.asmdef#974dd97c
+    - Samples~/NetworkedSample/Scripts/Spellbound.Sample4.asmdef#f4f07650
+    - Samples~/OrbitingPlanets/GeoForge.Sample3.asmdef#1142d096
+    - Samples~/OrbitingPlanets/GeoForge.Sample3.asmdef#1faf009a
+    - Samples~/OrbitingPlanets/GeoForge.Sample3.asmdef#29ba2ec8
+    - Samples~/OrbitingPlanets/GeoForge.Sample3.asmdef#2dee8301
+    - Samples~/OrbitingPlanets/GeoForge.Sample3.asmdef#2f5ca63a
+    reason: Assembly references by GUID from before the line; the density stories
+      (W2a) replace them by names when they next touch the assemblies.
+    endsAt: 1.0.0
+    handle: pipeline
+  - rule: C4
+    revision: 1
+    subjects:
+    - Runtime/Scripts/BlobsAndSOs/MaterialSideTable.cs#a9613f54
+    - Runtime/Scripts/BlobsAndSOs/MaterialSideTable.cs#fcc08781
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#01367f2e
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#01cef1e3
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#035b9a84
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#0968e973
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#0f4906a0
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#403915a4
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#5a21ac52
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#627eb1ed
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#66d26fdc
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#a9613f54
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#db349ad2
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#f0728771
+    - Runtime/Scripts/BlobsAndSOs/VoxelMaterialDatabase.cs#f0f4b344
+    - Runtime/Scripts/BlobsAndSOs/VoxelVolumeConfig.cs#a9613f54
+    - Runtime/Scripts/Chunks/GeoChunkEngine.cs#5a21ac52
+    - Runtime/Scripts/Commands/TerraformArcCommand.cs#0ff33ae7
+    - Runtime/Scripts/Commands/TerraformArcCommand.cs#7fa7a3dd
+    - Runtime/Scripts/Commands/TerraformCommandUtility.cs#5a21ac52
+    - Runtime/Scripts/Commands/TerraformCommandUtility.cs#a9613f54
+    - Runtime/Scripts/Commands/TerraformCubeCommand.cs#153a1352
+    - Runtime/Scripts/Commands/TerraformSphereCommand.cs#5a21ac52
+    - Runtime/Scripts/Manager/GeoForgeManager.DenseCache.cs#5a21ac52
+    - Runtime/Scripts/Manager/GeoForgeManager.DenseCache.cs#5a21ac52.2
+    - Runtime/Scripts/Manager/GeoForgeManager.DenseCache.cs#5a21ac52.3
+    - Runtime/Scripts/Manager/GeoForgeManager.DenseCache.cs#5a21ac52.4
+    - Runtime/Scripts/Manager/GeoForgeManager.DenseCache.cs#5a21ac52.5
+    - Runtime/Scripts/Manager/GeoForgeManager.cs#b52f1b2f
+    - Runtime/Scripts/Manager/GeoForgeManager.materials.cs#5a21ac52
+    - Runtime/Scripts/Manager/GeoForgeManager.materials.cs#a9613f54
+    - Runtime/Scripts/Volumes/GeoVolume.cs#5a21ac52
+    - Runtime/Scripts/Volumes/GeoVolume.cs#883d86c3
+    - Runtime/Scripts/Volumes/GeoVolume.cs#c447bbfe
+    - Runtime/Scripts/Volumes/GeoVolumeEngine.cs#1b033519
+    - Runtime/Scripts/Volumes/GeoVolumeEngine.cs#2094696a
+    - Runtime/Scripts/Volumes/GeoVolumeEngine.cs#5a21ac52
+    - Runtime/Scripts/Volumes/GeoVolumeEngine.cs#5a21ac52.2
+    - Runtime/Scripts/Volumes/GeoVolumeEngine.cs#5a21ac52.3
+    - Runtime/Scripts/Volumes/GeoVolumeEngine.cs#846918ff
+    - Runtime/Scripts/Volumes/GeoVolumeEngine.cs#a9613f54
+    - Runtime/Scripts/Volumes/GeoVolumeEngine.cs#d4edc041
+    - Samples~/DiggingAHole/Scripts/Controller.cs#00bd1fb0
+    - Samples~/DiggingAHole/Scripts/Controller.cs#49d65611
+    - Samples~/MiningOreVeins/Scripts/Controller.cs#00bd1fb0
+    - Samples~/MiningOreVeins/Scripts/Controller.cs#49d65611
+    - Samples~/NetworkedSample/Scripts/Controller.cs#00bd1fb0
+    - Samples~/NetworkedSample/Scripts/Controller.cs#49d65611
+    - Samples~/NetworkedSample/Scripts/NetworkedChunk.cs#217babfb
+    - Samples~/NetworkedSample/Scripts/NetworkedChunk.cs#257daa0c
+    - Samples~/NetworkedSample/Scripts/NetworkedChunk.cs#417bda28
+    - Samples~/NetworkedSample/Scripts/NetworkedChunk.cs#57342cc5
+    - Samples~/NetworkedSample/Scripts/NetworkedChunk.cs#6a187112
+    - Samples~/NetworkedSample/Scripts/NetworkedChunk.cs#938d4e1c
+    - Samples~/NetworkedSample/Scripts/NetworkedChunk.cs#b56e6540
+    - Samples~/NetworkedSample/Scripts/NetworkedChunk.cs#b56e6540.2
+    - Samples~/NetworkedSample/Scripts/NetworkedVolume.cs#69dbe8f6
+    - Samples~/NetworkedSample/Scripts/NetworkedVolume.cs#97c7b89b
+    - Samples~/OrbitingPlanets/Scripts/Controller.cs#00bd1fb0
+    - Samples~/OrbitingPlanets/Scripts/Controller.cs#49d65611
+    reason: Debug.Log calls from before the line; Core's logger replaces them in
+      the mechanical fixes of LV3a.
+    endsAt: 1.0.0
+    handle: pipeline
+  - rule: C5
+    revision: 1
+    subjects:
+    - Runtime/Scripts/Volumes/GeoVolume.cs#664fc953
+    - Runtime/Scripts/Volumes/GeoVolume.cs#aad52a1e
+    - Runtime/Scripts/Volumes/GeoVolume.cs#e7a2bd1c
+    reason: The level of detail target resolves Camera.main; the chunk interest over
+      Core's viewer source (W2a) replaces it.
+    endsAt: 1.0.0
+    handle: pipeline
+  - rule: C7
+    revision: 1
+    subjects:
+    - Runtime/SpellBound.GeoForge.asmdef
+    reason: The runtime assembly builds meshes; W2a splits it into a collision part
+      for every build and a picture part under the server define.
+    endsAt: 1.0.0
+    handle: pipeline
+  answers: []
+  gates: []

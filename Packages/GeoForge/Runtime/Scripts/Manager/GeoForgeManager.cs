@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using Spellbound.Core.Logging;
 using Spellbound.Core.Tooling;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -13,25 +14,31 @@ namespace Spellbound.GeoForge {
     /// </summary>
     [DefaultExecutionOrder(-1000)]
     public partial class GeoForgeManager : MonoBehaviour {
-        // Judgment call, leaning internal: no established "pluggable strategy" story for this one
-        // the way jobAndRenderProfile has (see GeoForgeManager.JobManager.cs) - it's just which
-        // GameObject GetPooledObject instantiates. Worth a deliberate look before narrowing though,
-        // in case a consumer legitimately wants to swap this at runtime.
-        [SerializeField] internal GameObject octreePrefab;
+        [SerializeField] private GameObject octreePrefab;
 
-        // Judgment call, leaning public: plausibly useful for external code/UI to enumerate or
-        // look up materials by index, not obviously pure-internal the way octreePrefab is.
         [SerializeField] public VoxelMaterialDatabase materialDatabase;
 
-        private readonly Stack<GameObject> _objectPool = new();
         private readonly HashSet<IGeoVolume> _voxelVolumes = new();
 
         private HashSet<byte> _allMaterials;
         private bool _isActive;
+        private IChunkPresenter _presenter;
+        private bool _warnedOfMissingPresenter;
 
-        private bool _isShuttingDown;
+        public GameObject LeafPrefab {
+            get => octreePrefab;
+            set => octreePrefab = value;
+        }
 
-        private Transform _objectPoolParent;
+        public IChunkPresenter Presenter {
+            get {
+                if (_presenter == null)
+                    ResolvePresenter();
+
+                return _presenter;
+            }
+            set => _presenter = value;
+        }
 
         // Internal: raw MC lookup tables, only ever consumed by the march jobs via
         // profile.ScheduleMarchingCubes(_gfManager.McTablesBlob, ...) - no external caller needs
@@ -41,8 +48,6 @@ namespace Spellbound.GeoForge {
         private void Awake() {
             SingletonManager.RegisterSingleton(this);
             McTablesBlob = McTablesBlobCreator.CreateMcTablesBlobAsset();
-            _objectPoolParent = new GameObject("OctreeLeafPool").transform;
-            _objectPoolParent.SetParent(transform);
             ValidateAllVolumesLodsAsync();
             _isActive = true;
         }
@@ -51,14 +56,28 @@ namespace Spellbound.GeoForge {
             OctreeBatchTransitionUpdate?.Invoke();
         }
 
+        private void ResolvePresenter() {
+            if (TryGetComponent<IChunkPresenter>(out var presenter)) {
+                _presenter = presenter;
+
+                return;
+            }
+
+            _presenter = ChunkPresenterDefaults.Create(this);
+
+            if (_presenter != null || _warnedOfMissingPresenter)
+                return;
+
+            _warnedOfMissingPresenter = true;
+            Log.Emit(LogLevel.Warning,
+                $"{name}: no chunk presenter is installed, so terrain is meshed but nothing is drawn.", this);
+        }
+
         private void OnDestroy() {
             _isActive = false;
-            _isShuttingDown = true;
 
             if (McTablesBlob.IsCreated)
                 McTablesBlob.Dispose();
-
-            ClearPool();
 
             DisposeMarchBufferPools();
             foreach (var kvp in _denseVoxelDataDict)
@@ -140,47 +159,6 @@ namespace Spellbound.GeoForge {
 
         public void UnRegisterVoxelVolume(IGeoVolume geoVolume) {
             _voxelVolumes.Remove(geoVolume);
-        }
-
-        // Internal: pooling plumbing specifically tied to OctreeNode's leaf/transition GameObject
-        // lifecycle (BuildLeaf/BuildTransitions/ReleaseLeafObjects) - not a general-purpose object
-        // pool meant for external use.
-        internal GameObject GetPooledObject(Transform parent) {
-            GameObject go;
-
-            if (_objectPool.Count > 0) {
-                go = _objectPool.Pop();
-                go.SetActive(true);
-            }
-            else {
-                go = Instantiate(octreePrefab);
-
-                // Apply the runtime material to new instances
-                var renderer = go.GetComponent<MeshRenderer>();
-                if (renderer != null) renderer.sharedMaterial = jobAndRenderProfile.Material;
-            }
-
-            go.transform.SetParent(parent, false);
-
-            if (go.transform.parent == null) Debug.LogError("Pooled object is being provided with no parent");
-
-            return go;
-        }
-
-        internal void ReleasePooledObject(GameObject go) {
-            if (go == null) return;
-
-            go.SetActive(false);
-
-            if (_objectPoolParent != null && !_isShuttingDown)
-                go.transform.SetParent(_objectPoolParent);
-            else
-                go.transform.SetParent(null);
-            _objectPool.Push(go);
-        }
-
-        private void ClearPool() {
-            while (_objectPool.Count > 0) Destroy(_objectPool.Pop());
         }
 
         /// <summary>
@@ -350,6 +328,25 @@ namespace Spellbound.GeoForge {
                     continue;
 
                 queryVolume = voxelVolume;
+                return true;
+            }
+
+            return false;
+        }
+
+        public bool TryQuerySurfaceCase(Vector3 position, out SurfaceCase surfaceCase, out IGeoVolume queryVolume) {
+            surfaceCase = default;
+            queryVolume = null;
+
+            foreach (var voxelVolume in _voxelVolumes) {
+                if (!voxelVolume.IsPrimaryTerrain)
+                    continue;
+
+                if (!voxelVolume.TryQuerySurfaceCase(position, out surfaceCase))
+                    continue;
+
+                queryVolume = voxelVolume;
+
                 return true;
             }
 

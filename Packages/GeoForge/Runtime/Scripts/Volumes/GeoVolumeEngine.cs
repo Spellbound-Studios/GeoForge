@@ -5,7 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Spellbound.Core.Packing;
 using Spellbound.Core.Tooling;
+using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -185,6 +187,45 @@ namespace Spellbound.GeoForge {
 
             materialIndex = allSolidMaterialsMatch ? firstSolidMaterial : nearestSolidMaterial;
             materialIndex %= VoxelData.MatureBitValue;
+
+            return true;
+        }
+
+        public bool TryQuerySurfaceCase(Vector3 worldPosition, out SurfaceCase surfaceCase) {
+            surfaceCase = default;
+
+            var continuousVoxelPosition = WorldToVoxelSpaceContinuous(worldPosition);
+
+            var nearestVoxelPosition = new Vector3Int(
+                Mathf.RoundToInt(continuousVoxelPosition.x),
+                Mathf.RoundToInt(continuousVoxelPosition.y),
+                Mathf.RoundToInt(continuousVoxelPosition.z));
+
+            var chunk = GetChunkByVoxelPosition(nearestVoxelPosition);
+
+            if (chunk == null || !chunk.HasVoxelData())
+                return false;
+
+            if (!SingletonManager.TryGetSingletonInstance<GeoForgeManager>(out var manager) ||
+                !manager.McTablesBlob.IsCreated)
+                return false;
+
+            var cellOrigin = new Vector3Int(
+                Mathf.FloorToInt(continuousVoxelPosition.x),
+                Mathf.FloorToInt(continuousVoxelPosition.y),
+                Mathf.FloorToInt(continuousVoxelPosition.z));
+
+            ref var tables = ref manager.McTablesBlob.Value;
+            var corners = new NativeArray<VoxelData>(SurfaceCase.CornerCount, Allocator.Temp);
+
+            for (var corner = 0; corner < SurfaceCase.CornerCount; corner++) {
+                var offset = tables.RegularCornerOffset[corner];
+                var cornerPosition = cellOrigin + new Vector3Int(offset.x, offset.y, offset.z);
+                corners[corner] = chunk.GetVoxelDataFromVoxelPosition(cornerPosition);
+            }
+
+            surfaceCase = SurfaceCases.FromCorners(cellOrigin, corners);
+            corners.Dispose();
 
             return true;
         }

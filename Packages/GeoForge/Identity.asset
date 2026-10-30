@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fa71a9935daf3a419aaab4c130b95e3, type: 3}
+  m_Name: Identity
+  m_EditorClassIdentifier: Spellbound.Core.Editor::Spellbound.Core.Packages.Editor.PackageIdentity
+  kind: library
+  layer: mechanism
+  status: active
+  job: 'Turns a density field into meshes: octree chunks, marching cubes with Transvoxel
+    seams, edits of any shape, materials, and queries of voxels, materials and surface
+    cases.'
+  frontDoor: GeoForgeKit
+  mustNotOwn:
+  - a world plan or generation passes
+  - sculpting
+  - a demo controller
+  - a fixed chunk presenter
+  hotPath: 1
+  deterministicOutput: 0
+  simulation: []
+  machineMatchedJobs: []
+  skeletonVersion: 1

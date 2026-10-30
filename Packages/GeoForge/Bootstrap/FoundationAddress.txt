@@ -1,0 +1,1 @@
+https://github.com/Spellbound-Studios/Core.git?path=/Packages/Core#dev
