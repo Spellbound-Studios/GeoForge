@@ -1,0 +1,18 @@
+branches:
+  - main
+  - name: rc
+    prerelease: true
+  - name: beta
+    prerelease: true
+plugins:
+  - "@semantic-release/commit-analyzer"
+  - "@semantic-release/release-notes-generator"
+  - - "@semantic-release/changelog"
+    - changelogFile: Packages/GeoForge/CHANGELOG.md
+  - - "@semantic-release/exec"
+    - prepareCmd: bash scripts/set-package-version.sh ${nextRelease.version}
+  - - "@semantic-release/git"
+    - assets:
+        - Packages/GeoForge/package.json
+        - Packages/GeoForge/CHANGELOG.md
+  - "@semantic-release/github"

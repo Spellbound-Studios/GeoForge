@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+command -v git-lfs >/dev/null 2>&1 || { echo "Git LFS is not installed, so this repository cannot run its post-commit hook. Install Git for Windows again with its default options." >&2; exit 2; }
+exec git lfs post-commit "$@"
