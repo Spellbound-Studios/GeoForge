@@ -1,0 +1,45 @@
+* text=auto
+*.cs text eol=crlf
+*.asmdef text eol=crlf
+*.asmref text eol=crlf
+*.json text eol=crlf
+*.uss text eol=crlf
+*.uxml text eol=crlf
+*.md text eol=crlf
+*.yml text eol=crlf
+*.yaml text eol=crlf
+*.sh text eol=lf
+.githooks/* text eol=lf
+
+Assets/_Project/**/*.fbx filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.FBX filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.obj filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.blend filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.dae filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.3ds filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.png filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.PNG filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.tga filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.tif filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.tiff filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.psd filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.exr filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.hdr filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.bmp filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.gif filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.wav filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.mp3 filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.ogg filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.aif filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.aiff filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.flac filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.mov filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.webm filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.ttf filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.otf filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.unitypackage filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.zip filter=lfs diff=lfs merge=lfs -text
+Assets/_Project/**/*.7z filter=lfs diff=lfs merge=lfs -text
