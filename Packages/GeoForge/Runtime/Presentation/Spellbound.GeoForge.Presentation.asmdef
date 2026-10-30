@@ -1,0 +1,23 @@
+{
+  "name": "Spellbound.GeoForge.Presentation",
+  "rootNamespace": "Spellbound.GeoForge.Presentation",
+  "references": [
+    "Spellbound.GeoForge",
+    "Spellbound.Core"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": ["!UNITY_SERVER", "SPELLBOUND_CORE"],
+    "versionDefines": [
+    {
+      "name": "com.spellboundstudios.core",
+      "expression": "[1.1.9,3.0.0)",
+      "define": "SPELLBOUND_CORE"
+    }
+  ],
+  "noEngineReferences": false
+}

@@ -1,0 +1,29 @@
+{
+  "name": "Spellbound.GeoForge.Tests",
+  "rootNamespace": "Spellbound.GeoForge.Tests",
+  "references": [
+    "Spellbound.GeoForge",
+    "Spellbound.GeoForge.Presentation",
+    "Spellbound.Core",
+    "Unity.Collections",
+    "Unity.Entities",
+    "Unity.Mathematics",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "SPELLBOUND_CORE", "!UNITY_SERVER"],
+    "versionDefines": [
+    {
+      "name": "com.spellboundstudios.core",
+      "expression": "[1.1.9,3.0.0)",
+      "define": "SPELLBOUND_CORE"
+    }
+  ],
+  "noEngineReferences": false
+}

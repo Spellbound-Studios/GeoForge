@@ -44,6 +44,10 @@ namespace Spellbound.GeoForge {
             return GeoVolumeEngine.TryQuerySurfaceMaterial(worldPosition, out materialIndex);
         }
 
+        bool TryQuerySurfaceCase(Vector3 worldPosition, out SurfaceCase surfaceCase) {
+            return GeoVolumeEngine.TryQuerySurfaceCase(worldPosition, out surfaceCase);
+        }
+
         void OnTerraform(Vector3 worldPosition, int voxelCount) { }
 
         Transform VolumeTransform => GeoVolumeEngine.Transform;

@@ -25,18 +25,18 @@ namespace Spellbound.GeoForge {
         private Vector3Int[] _cachedNeighborPositions;
         private OctreeNode[] _children;
         private NativeList<int> _filteredTransitionTriangles;
-        private GameObject _leafGo;
+        private IChunkLeaf _leaf;
 
         // True once this node has been evaluated as a leaf (MakeLeaf has run at least once since
-        // the last Subdivide) - independent of whether _leafGo actually exists. A leaf whose
-        // geometry marches to zero triangles never gets a GameObject at all (see ApplyMarchResults),
+        // the last Subdivide) - independent of whether _leaf actually exists. A leaf whose
+        // geometry marches to zero triangles never gets a presented leaf at all (see ApplyMarchResults),
         // but still needs to be recognized as "already handled" so ValidateOctreeLods doesn't
         // re-schedule a march job for it every single validation pass.
         private bool _leafInitialized;
-        private MaterialPropertyBlock _materialPropertyBlock;
+        private bool _awaitsPresenter;
+        private IChunkPresenter _leafPresenter;
         private Mesh _mesh;
         private bool _transitionDirtyFlag;
-        private GameObject _transitionGo;
         private int _transitionMask;
         private Mesh _transitionMesh;
         private NativeArray<int2> _transitionRanges;
@@ -78,7 +78,7 @@ namespace Spellbound.GeoForge {
                 _transitionRanges.Dispose();
 
             // Unconditional: covers non-leaf/parent nodes too, where ReleaseLeafObjects above is a
-            // no-op (it only unsubscribes when _leafGo != null). Safe to call twice - event -= is
+            // no-op (it only unsubscribes when _leaf != null). Safe to call twice - event -= is
             // always a no-op if not currently subscribed.
             _gfManager.OctreeBatchTransitionUpdate -= HandleTransitionUpdate;
         }
@@ -137,47 +137,36 @@ namespace Spellbound.GeoForge {
             return true;
         }
 
-        /// <summary>
-        ///     Releases the pooled leaf/transition GameObjects (if any exist) and destroys their
-        ///     Meshes, mirroring what used to be duplicated inline in both Dispose() and Subdivide().
-        ///     Safe to call when _leafGo is already null (no-op). Also unsubscribes from
-        ///     OctreeBatchTransitionUpdate and clears the dirty flag: a transition update might still
-        ///     be queued for this node from just before it lost its leaf objects (either via Subdivide
-        ///     or via ApplyMarchResults finding zero triangles) - otherwise the next batched invocation
-        ///     would run HandleTransitionUpdate() against a now-null _transitionMesh. _transitionRanges
-        ///     stays created deliberately (see class-level NativeCollections) - HandleTransitionUpdate's
-        ///     own IsCreated guard doesn't catch this case, which is exactly why this needs its own
-        ///     explicit unsubscribe rather than relying on that guard.
-        /// </summary>
         private void ReleaseLeafObjects() {
-            if (_leafGo == null)
+            if (_leaf == null)
                 return;
 
-            if (_transitionGo.TryGetComponent<MeshCollider>(out var transitionMeshCollider))
-                transitionMeshCollider.sharedMesh = null;
-            _gfManager.ReleasePooledObject(_transitionGo);
-            _transitionGo = null;
+            try {
+                _leafPresenter.Release(_leaf);
+            }
+            finally {
+                _leaf = null;
+                _leafPresenter = null;
+                DestroyMesh(ref _transitionMesh);
+                DestroyMesh(ref _mesh);
+                _gfManager.OctreeBatchTransitionUpdate -= HandleTransitionUpdate;
+                _transitionDirtyFlag = false;
+            }
+        }
 
-            if (_transitionMesh != null) {
-                Object.Destroy(_transitionMesh);
-                _transitionMesh = null;
+        private static void DestroyMesh(ref Mesh mesh) {
+            if (mesh != null) {
+                if (Application.isPlaying)
+                    Object.Destroy(mesh);
+                else
+                    Object.DestroyImmediate(mesh);
             }
 
-            if (_leafGo.TryGetComponent<MeshCollider>(out var meshCollider)) meshCollider.sharedMesh = null;
-            _gfManager.ReleasePooledObject(_leafGo);
-            _leafGo = null;
-
-            if (_mesh != null) {
-                Object.Destroy(_mesh);
-                _mesh = null;
-            }
-
-            _gfManager.OctreeBatchTransitionUpdate -= HandleTransitionUpdate;
-            _transitionDirtyFlag = false;
+            mesh = null;
         }
 
         internal void ValidateMaterial() {
-            if (_leafGo != null) {
+            if (_leaf != null) {
                 SetMaterialOrigin();
 
                 return;
@@ -189,22 +178,7 @@ namespace Spellbound.GeoForge {
         }
 
         private void SetMaterialOrigin() {
-            // Reuse the existing _materialPropertyBlock field instead of allocating a fresh
-            // MaterialPropertyBlock every call - this runs once per leaf, every frame, for any
-            // volume that's currently moving (via ValidateMaterial -> OnVolumeMovement), so a
-            // per-call allocation here was real, avoidable GC pressure. Clear() resets it for
-            // reuse rather than risking stale state leaking in from whatever it held last.
-            _materialPropertyBlock ??= new MaterialPropertyBlock();
-            _materialPropertyBlock.Clear();
-            _materialPropertyBlock.SetMatrix("_WorldToLocal", _parentGeoVolume.VolumeTransform.worldToLocalMatrix);
-
-            var meshRenderer = _leafGo.GetComponent<MeshRenderer>();
-            meshRenderer.SetPropertyBlock(_materialPropertyBlock);
-
-            if (_transitionGo != null) {
-                meshRenderer = _transitionGo.GetComponent<MeshRenderer>();
-                meshRenderer.SetPropertyBlock(_materialPropertyBlock);
-            }
+            _leaf.SetVolumeMatrix(_parentGeoVolume.VolumeTransform.worldToLocalMatrix);
         }
 
         internal void ValidateOctreeLods(Vector3 playerPosition, NativeArray<VoxelData> voxelArray) {
@@ -223,8 +197,12 @@ namespace Spellbound.GeoForge {
 
                 if (!_leafInitialized)
                     MakeLeaf(voxelArray);
+                else if (_awaitsPresenter && _gfManager.Presenter != null) {
+                    _awaitsPresenter = false;
+                    MarchAndMesh(voxelArray);
+                }
 
-                _leafGo?.SetActive(true);
+                _leaf?.SetVisible(true);
 
                 return;
             }
@@ -399,30 +377,15 @@ namespace Spellbound.GeoForge {
             // instead of scanning every vertex again here via RecalculateBounds().
             _mesh.bounds = computedBounds;
 
-            // ApplyMarchResults only calls this once triangles.Length/vertices.Length are already
-            // confirmed >= 3, so there's no "empty mesh" case left to guard against here - that's
-            // handled upstream by releasing the leaf entirely instead of calling this at all.
-            if (_leafGo.TryGetComponent<MeshCollider>(out var meshCollider))
-                meshCollider.sharedMesh = _mesh;
-
-            if (_leafGo.TryGetComponent<LeafBehaviour>(out var leafBehaviour)) leafBehaviour.OnMeshUpdated(_lod);
+            _leaf.SetMesh(_mesh, _lod);
         }
 
         private void BuildTransitions() {
-            _transitionGo = _gfManager.GetPooledObject(_leafGo.transform);
-            _transitionGo.transform.localPosition = Vector3.zero;
-            _transitionGo.transform.localRotation = Quaternion.identity;
-
-            if (_transitionMesh != null)
-                Object.Destroy(_transitionMesh);
+            DestroyMesh(ref _transitionMesh);
 
             _transitionMesh = new Mesh();
             _transitionMesh.MarkDynamic();
-            _transitionGo.GetComponent<MeshFilter>().mesh = _transitionMesh;
-
-            _transitionGo.name = "Transition " +
-                                 $"at {_localPosition.x}, {_localPosition.y}, {_localPosition.z}";
-            _transitionGo.transform.parent = _leafGo.transform;
+            _leaf.SetTransitionMesh(_transitionMesh);
 
             _transitionMask = 0;
 
@@ -436,20 +399,17 @@ namespace Spellbound.GeoForge {
                 _transitionRanges = new NativeArray<int2>(6, Allocator.Persistent);
         }
 
-        private void BuildLeaf() {
-            _leafGo = _gfManager.GetPooledObject(_geoChunk.GeoChunkEngine.Transform);
-            _leafGo.transform.localPosition = Vector3.zero;
-            _leafGo.transform.localRotation = Quaternion.identity;
+        private void BuildLeaf(IChunkPresenter presenter) {
+            _leafPresenter = presenter;
+            _leaf = presenter.Acquire(_geoChunk.GeoChunkEngine.Transform, _lod);
 
-            if (_mesh != null)
-                Object.Destroy(_mesh);
+            _leaf.Name = $"LeafSize {_parentGeoVolume.ConfigBlob.Value.CubesMarchedPerOctreeLeaf << _lod} " +
+                         $"at {_localPosition.x}, {_localPosition.y}, {_localPosition.z}";
+
+            DestroyMesh(ref _mesh);
 
             _mesh = new Mesh();
             _mesh.MarkDynamic();
-            _leafGo.GetComponent<MeshFilter>().mesh = _mesh;
-
-            _leafGo.name = $"LeafSize {_parentGeoVolume.ConfigBlob.Value.CubesMarchedPerOctreeLeaf << _lod} " +
-                           $"at {_localPosition.x}, {_localPosition.y}, {_localPosition.z}";
         }
 
         private void UpdateTransitionVertexBuffer(NativeList<MeshingVertexData> vertices) {
@@ -599,10 +559,19 @@ namespace Spellbound.GeoForge {
                 return;
             }
 
-            var isFirstBuild = _leafGo == null;
+            var isFirstBuild = _leaf == null;
 
             if (isFirstBuild) {
-                BuildLeaf();
+                var presenter = _gfManager.Presenter;
+
+                if (presenter == null) {
+                    _awaitsPresenter = true;
+
+                    return;
+                }
+
+                _awaitsPresenter = false;
+                BuildLeaf(presenter);
                 BuildTransitions();
                 SetMaterialOrigin();
             }

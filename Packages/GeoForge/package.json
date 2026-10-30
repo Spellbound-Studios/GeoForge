@@ -3,7 +3,7 @@
   "version": "0.6.24",
   "displayName": "Spellbound.GeoForge",
   "description": "Package for a Dynamic 3-Dimensional World. Powered by performant multi-threaded Marching Cubes.",
-  "unity": "6000.0",
+  "unity": "6000.3",
   "author": {
     "name": "Spellbound Studios",
     "email": "Judsin1349@gmail.com",
@@ -14,8 +14,7 @@
     "com.unity.entities.graphics": "1.3.14",
     "com.unity.mathematics": "1.3.2",
     "com.unity.burst": "1.8.19",
-    "com.unity.collections": "2.5.7",
-    "com.spellboundstudios.core": "1.0.1"
+    "com.unity.collections": "2.5.7"
   },
   "keywords": [
     "marching-cubes",

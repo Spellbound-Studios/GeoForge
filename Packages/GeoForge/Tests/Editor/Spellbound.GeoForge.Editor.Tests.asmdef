@@ -4,8 +4,13 @@
   "references": [
     "Spellbound.GeoForge",
     "Spellbound.GeoForge.Editor",
+    "Spellbound.GeoForge.Presentation",
+    "Spellbound.GeoForge.Tests",
     "Spellbound.Core",
     "Spellbound.Core.Editor",
+    "Unity.Collections",
+    "Unity.Entities",
+    "Unity.Mathematics",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],
@@ -15,7 +20,7 @@
   "overrideReferences": true,
   "precompiledReferences": ["nunit.framework.dll"],
   "autoReferenced": false,
-  "defineConstraints": ["UNITY_INCLUDE_TESTS", "SPELLBOUND_CORE"],
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "SPELLBOUND_CORE", "!UNITY_SERVER"],
   "versionDefines": [
     {
       "name": "com.spellboundstudios.core",

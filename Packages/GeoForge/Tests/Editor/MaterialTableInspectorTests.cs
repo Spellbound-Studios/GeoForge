@@ -3,7 +3,6 @@
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
-using Spellbound.Core.Authoring;
 using Spellbound.Core.Controls.Editor;
 using Spellbound.GeoForge.Materials.Editor;
 using UnityEditor;
@@ -49,7 +48,8 @@ namespace Spellbound.GeoForge.Tests {
             Assert.AreEqual(MaterialTableInspector.SyncText, sync.text);
             Assert.AreEqual(MaterialTableInspector.ValidateText, validate.text);
             Assert.AreEqual(MaterialTableInspector.NotValidatedText, Status(root).Title);
-            Assert.IsNull(Status(root).Severity);
+            Assert.AreEqual(HeaderStates.Neutral, Status(root).State);
+            Assert.IsTrue(root.ClassListContains(EditorLook.ThemeClassName));
         }
 
         [Test]
@@ -62,8 +62,8 @@ namespace Spellbound.GeoForge.Tests {
 
             CollectionAssert.AreEqual(new[] { NoDatabaseProblem }, problems);
             var status = Status(root);
-            Assert.AreEqual(FindingSeverity.Error, status.Severity);
-            Assert.IsTrue(status.ClassListContains(HeaderBar.ErrorClassName));
+            Assert.AreEqual(HeaderStates.Error, status.State);
+            Assert.IsTrue(status.ClassListContains(HeaderStates.ClassNameFor(HeaderStates.Error)));
             CollectionAssert.AreEqual(new[] { NoDatabaseProblem }, ProblemTexts(root));
         }
 
@@ -77,7 +77,8 @@ namespace Spellbound.GeoForge.Tests {
 
             Assert.IsEmpty(problems);
             var status = Status(root);
-            Assert.AreEqual(FindingSeverity.Information, status.Severity);
+            Assert.AreEqual(HeaderStates.Passed, status.State);
+            Assert.IsTrue(status.ClassListContains(HeaderStates.ClassNameFor(HeaderStates.Passed)));
             Assert.AreEqual(MaterialTableInspector.InSyncText, status.Title);
             Assert.IsEmpty(ProblemTexts(root));
             LogAssert.NoUnexpectedReceived();
@@ -96,7 +97,7 @@ namespace Spellbound.GeoForge.Tests {
             CollectionAssert.AreEqual(new[] { "Stone", "Sand", "Clay" }, EntryNames(inspector.serializedObject));
             Assert.IsEmpty(table.Validate());
             Assert.Greater(EditorUtility.GetDirtyCount(table), dirtyCount);
-            Assert.AreEqual(FindingSeverity.Information, Status(root).Severity);
+            Assert.AreEqual(HeaderStates.Passed, Status(root).State);
             Assert.IsEmpty(ProblemTexts(root));
         }
 
