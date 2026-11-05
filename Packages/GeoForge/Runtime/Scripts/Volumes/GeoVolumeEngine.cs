@@ -1,11 +1,10 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Spellbound.Core.Packing;
 using Spellbound.Core.Tooling;
-using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
@@ -215,17 +214,7 @@ namespace Spellbound.GeoForge {
                 Mathf.FloorToInt(continuousVoxelPosition.y),
                 Mathf.FloorToInt(continuousVoxelPosition.z));
 
-            ref var tables = ref manager.McTablesBlob.Value;
-            var corners = new NativeArray<VoxelData>(SurfaceCase.CornerCount, Allocator.Temp);
-
-            for (var corner = 0; corner < SurfaceCase.CornerCount; corner++) {
-                var offset = tables.RegularCornerOffset[corner];
-                var cornerPosition = cellOrigin + new Vector3Int(offset.x, offset.y, offset.z);
-                corners[corner] = chunk.GetVoxelDataFromVoxelPosition(cornerPosition);
-            }
-
-            surfaceCase = SurfaceCases.FromCorners(cellOrigin, corners);
-            corners.Dispose();
+            surfaceCase = chunk.GeoChunkEngine.ComputeSurfaceCase(cellOrigin, ref manager.McTablesBlob.Value);
 
             return true;
         }

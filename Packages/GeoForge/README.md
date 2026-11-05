@@ -13,7 +13,7 @@ You can install GeoForge through Unity's Package Manager by adding a package thr
 
 ```
 
-https://github.com/Spell-Bound-Studios/GeoForge.git
+https://github.com/Spellbound-Studios/GeoForge.git?path=/Packages/GeoForge#dev_1.0
 
 ```
 

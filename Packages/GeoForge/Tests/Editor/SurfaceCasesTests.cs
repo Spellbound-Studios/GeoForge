@@ -128,6 +128,27 @@ namespace Spellbound.GeoForge.Tests {
                 Assert.AreEqual(computed.Corner(corner), fromCorners.Corner(corner));
         }
 
+        [Test]
+        public void ACornerAtTheZeroThresholdIsSolidInEveryCaseCode() {
+            Fill(Air);
+
+            for (var corner = 0; corner < SurfaceCase.CornerCount; corner++) {
+                var density = corner == 0 ? (sbyte)0 : corner % 2 == 0 ? (sbyte)1 : (sbyte)-1;
+                Set(Cell + _tables.Value.RegularCornerOffset[corner], VoxelData.CreateImmature(density, 0));
+            }
+
+            var marchCorners = new NativeArray<VoxelData>(SurfaceCase.CornerCount, Allocator.Temp);
+            var marchCaseCode = GfMarchHelper.GatherRegularCornersAndComputeCaseCode(_voxels, ref _tables.Value, Cell,
+                0, 1, Area, Width, ref marchCorners);
+            var computed = Compute(Cell);
+            var fromCorners = SurfaceCases.FromCorners(new Vector3Int(1, 1, 1), marchCorners);
+            marchCorners.Dispose();
+
+            Assert.AreEqual(0x55, marchCaseCode);
+            Assert.AreEqual(marchCaseCode, computed.CaseCode);
+            Assert.AreEqual(marchCaseCode, fromCorners.CaseCode);
+        }
+
         private SurfaceCase Compute(int3 cellPosition) {
             return SurfaceCases.Compute(_voxels, cellPosition, Area, Width, ref _tables.Value);
         }

@@ -15,6 +15,10 @@ namespace Spellbound.GeoForge.Presentation {
         private GeoForgeManager _manager;
         private Transform _poolParent;
         private MaterialPropertyBlock _propertyBlock;
+        private bool _refusedMissingLeafPrefab;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private int _leavesHandedOut;
+#endif
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         private static void RegisterAsDefault() {
@@ -35,8 +39,19 @@ namespace Spellbound.GeoForge.Presentation {
         public IChunkLeaf Acquire(Transform parent, int levelOfDetail) {
             Initialize();
 
+            if (_manager.LeafPrefab == null) {
+                RefuseMissingLeafPrefab();
+
+                return null;
+            }
+
             var leafObject = Take(parent);
             var transitionObject = Take(leafObject.transform);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            _leavesHandedOut++;
+            leafObject.name = $"Leaf {_leavesHandedOut} at level of detail {levelOfDetail}";
+            transitionObject.name = $"{leafObject.name} Transition";
+#endif
 
             return new GameObjectChunkLeaf(leafObject, transitionObject, _propertyBlock);
         }
@@ -64,6 +79,15 @@ namespace Spellbound.GeoForge.Presentation {
 
             _poolParent = new GameObject(PoolParentName).transform;
             _poolParent.SetParent(transform, false);
+        }
+
+        private void RefuseMissingLeafPrefab() {
+            if (_refusedMissingLeafPrefab)
+                return;
+
+            _refusedMissingLeafPrefab = true;
+            Log.Error($"{_manager.name}: {nameof(GeoForgeManager.LeafPrefab)} (Octree Prefab in the Inspector) " +
+                      "is not assigned, so no chunk leaf can be drawn.", _manager);
         }
 
         private GameObject Take(Transform parent) {

@@ -47,6 +47,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   octreePrefab: {fileID: 2677637181052615796, guid: 9a7674aaa7f6410458e017bb736f98a4, type: 3}
   materialDatabase: {fileID: 11400000, guid: f262553490c7f6d4fa3350502d00458c, type: 2}
+  jobAndRenderProfile: {fileID: 11400000, guid: a427e359e709c4147b143c593ffd27bd, type: 2}
   useColliders: 1
 --- !u!114 &4518230647120934711
 MonoBehaviour:

@@ -34,16 +34,6 @@ namespace Spellbound.GeoForge.Presentation {
 
         internal GameObject TransitionObject { get; }
 
-        public Transform Transform => LeafObject.transform;
-
-        public string Name {
-            get => LeafObject.name;
-            set {
-                LeafObject.name = value;
-                TransitionObject.name = $"{value} Transition";
-            }
-        }
-
         public void SetMesh(Mesh mesh, int levelOfDetail) {
             if (_leafFilter != null)
                 _leafFilter.sharedMesh = mesh;
@@ -69,10 +59,6 @@ namespace Spellbound.GeoForge.Presentation {
 
             if (_transitionRenderer != null)
                 _transitionRenderer.SetPropertyBlock(_propertyBlock);
-        }
-
-        public void SetVisible(bool visible) {
-            LeafObject.SetActive(visible);
         }
 
         internal void ClearMeshes() {

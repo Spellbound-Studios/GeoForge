@@ -1,7 +1,8 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
 using System.Collections.Generic;
+using Spellbound.Core.Logging;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -9,12 +10,6 @@ using UnityEngine;
 
 namespace Spellbound.GeoForge {
     public partial class GeoForgeManager : MonoBehaviour {
-        // Left public: this is the actual "plug in your own rendering strategy" knob
-        // (MaterialRenderingProfile is deliberately a public extension point per its own doc
-        // comment), and OctreeNode reads it every march via _gfManager.jobAndRenderProfile.
-        // internal would still satisfy that same-assembly read - worth deciding deliberately
-        // whether external code should also be able to swap profiles at runtime via script,
-        // rather than only through the Inspector, before narrowing this one.
         [SerializeField] public MaterialRenderingProfile jobAndRenderProfile;
 
         private readonly Dictionary<OctreeNode, Vector3Int> _nodeToChunkCoord = new();
@@ -22,6 +17,23 @@ namespace Spellbound.GeoForge {
         private readonly Dictionary<OctreeNode, TransitionMarchJobData> _pendingTransitionMarchJobData = new();
 
         private JobHandle _combinedJobHandle;
+        private bool _refusedMissingRenderingProfile;
+
+        internal bool TryGetRenderingProfile(out MaterialRenderingProfile profile) {
+            profile = jobAndRenderProfile;
+
+            if (profile != null)
+                return true;
+
+            if (_refusedMissingRenderingProfile)
+                return false;
+
+            _refusedMissingRenderingProfile = true;
+            Log.Error($"{name}: {nameof(jobAndRenderProfile)} (Job And Render Profile in the Inspector) is not " +
+                      "assigned, so nothing is marched; BarycentricProfile is the shipped default.", this);
+
+            return false;
+        }
 
         internal void RegisterMarchJob(
             OctreeNode node,

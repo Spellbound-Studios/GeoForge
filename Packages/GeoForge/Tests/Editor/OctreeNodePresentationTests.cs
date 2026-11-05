@@ -1,12 +1,15 @@
 // Copyright (c) Spellbound Studios. All rights reserved.
 
 using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Spellbound.Core.Tooling;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Spellbound.GeoForge.Tests {
     public class OctreeNodePresentationTests {
@@ -57,6 +60,9 @@ namespace Spellbound.GeoForge.Tests {
                 node.Dispose();
 
             _nodes.Clear();
+            _manager.RentVertexBuffer().Dispose();
+            _manager.RentTriangleBuffer().Dispose();
+            _manager.RentBoundsBuffer().Dispose();
 
             if (_configBlob.IsCreated)
                 _configBlob.Dispose();
@@ -86,7 +92,6 @@ namespace Spellbound.GeoForge.Tests {
             var leaf = _presenter.Acquired[0];
             Assert.AreSame(_chunkTransform, leaf.Parent);
             Assert.AreEqual(0, leaf.AcquiredLevelOfDetail);
-            Assert.AreEqual($"LeafSize {CubesPerMarch} at 0, 0, 0", leaf.Name);
             Assert.IsNotNull(leaf.Mesh);
             Assert.AreEqual(3, leaf.Mesh.vertexCount);
             Assert.AreEqual(3, leaf.Mesh.GetIndexCount(0));
@@ -110,7 +115,6 @@ namespace Spellbound.GeoForge.Tests {
             CollectionAssert.AreEqual(new IChunkLeaf[] { leaf }, _presenter.Released);
             Assert.IsTrue(mesh == null);
             Assert.IsTrue(transitionMesh == null);
-            CollectionAssert.DoesNotContain(_presenter.Calls, "SetVisible");
         }
 
         [Test]
@@ -161,6 +165,74 @@ namespace Spellbound.GeoForge.Tests {
         }
 
         [Test]
+        public void EveryTransitionRewriteHandsTheLeafItsTransitionMesh() {
+            var node = CreateNode();
+            ApplyTriangle(node);
+            var leaf = _presenter.Acquired[0];
+
+            Assert.AreEqual(1, TransitionMeshCalls());
+
+            using var vertices = TriangleVertices();
+            using var triangles = TriangleIndices();
+            using var ranges = new NativeArray<int2>(6, Allocator.Temp);
+
+            node.ApplyTransitionMarchResults(vertices, triangles, ranges);
+
+            Assert.AreEqual(2, TransitionMeshCalls());
+            Assert.AreEqual("SetTransitionMesh", _presenter.Calls[_presenter.Calls.Count - 1]);
+
+            node.ApplyTransitionMarchResults(vertices, triangles, ranges);
+
+            Assert.AreEqual(3, TransitionMeshCalls());
+            Assert.IsNotNull(leaf.TransitionMesh);
+            Assert.AreEqual(3, leaf.TransitionMesh.vertexCount);
+        }
+
+        [Test]
+        public void APresenterThatRefusesALeafIsAskedOnceUntilItIsReplaced() {
+            var profile = UseRecordingProfile();
+            _presenter.HandsOutLeaves = false;
+            var node = CreateNode();
+
+            for (var pass = 0; pass < 3; pass++)
+                Validate(node);
+
+            Assert.AreEqual(1, profile.Marches);
+            CollectionAssert.AreEqual(new[] { "Acquire" }, _presenter.Calls);
+            Assert.AreEqual(0, _chunk.NewLeafBroadcasts);
+
+            var replacement = new RecordingChunkPresenter();
+            _manager.Presenter = replacement;
+            Validate(node);
+
+            Assert.AreEqual(2, profile.Marches);
+            Assert.AreEqual(1, replacement.Acquired.Count);
+            Assert.AreEqual("SetMesh", replacement.Calls[replacement.Calls.Count - 1]);
+            Assert.AreEqual(3, replacement.Acquired[0].Mesh.vertexCount);
+            CollectionAssert.AreEqual(new[] { "Acquire" }, _presenter.Calls);
+        }
+
+        [Test]
+        public void AManagerWithoutARenderingProfileRefusesOnceAndMarchesNothing() {
+            _volume.ViewDistanceLodRanges = new[] { new Vector2(0f, float.MaxValue) };
+            var node = CreateNode();
+            LogAssert.Expect(LogType.Error,
+                new Regex(Regex.Escape(_manager.name) + ".*" + nameof(GeoForgeManager.jobAndRenderProfile)));
+
+            Assert.DoesNotThrow(() => Validate(node));
+            Assert.DoesNotThrow(() => Validate(node));
+
+            LogAssert.NoUnexpectedReceived();
+            CollectionAssert.IsEmpty(_presenter.Calls);
+            CollectionAssert.IsEmpty(_chunk.KnownEmptyAddresses);
+
+            var profile = UseRecordingProfile();
+            Validate(node);
+
+            Assert.AreEqual(0, profile.Marches);
+        }
+
+        [Test]
         public void WithoutAPresenterMarchResultsAreDiscardedAndEmptyAddressesAreStillRecorded() {
             _manager.Presenter = null;
             var node = CreateNode();
@@ -181,6 +253,23 @@ namespace Spellbound.GeoForge.Tests {
 
             CollectionAssert.AreEqual(new[] { (0, Vector3Int.zero) }, _chunk.KnownEmptyAddresses);
             CollectionAssert.IsEmpty(_presenter.Calls);
+        }
+
+        private RecordingRenderingProfile UseRecordingProfile() {
+            _volume.ViewDistanceLodRanges = new[] { new Vector2(0f, float.MaxValue) };
+            var profile = Track(ScriptableObject.CreateInstance<RecordingRenderingProfile>());
+            _manager.jobAndRenderProfile = profile;
+
+            return profile;
+        }
+
+        private void Validate(OctreeNode node) {
+            node.ValidateOctreeLods(Vector3.zero, default);
+            _manager.CompleteAndApplyMarchingCubesJobs();
+        }
+
+        private int TransitionMeshCalls() {
+            return _presenter.Calls.Count(call => call == "SetTransitionMesh");
         }
 
         private OctreeNode CreateNode() {

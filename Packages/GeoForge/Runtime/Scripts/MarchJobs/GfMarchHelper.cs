@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Spellbound Studio Inc.
+﻿// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System.Runtime.CompilerServices;
 using Unity.Burst;
@@ -72,24 +72,60 @@ namespace Spellbound.GeoForge {
             int chunkDataAreaSize,
             int chunkDataWidthSize,
             ref NativeArray<VoxelData> cellValues) {
-            for (var i = 0; i < 8; ++i) {
-                var voxelPosition = cellPos + new int3(padding, padding, padding) +
-                                    tables.RegularCornerOffset[i] * lodScale;
+            var caseCode = 0;
 
-                cellValues[i] = voxelArray[GfStaticHelper.Coord3DToIndex(
-                    voxelPosition.x, voxelPosition.y, voxelPosition.z,
-                    chunkDataAreaSize, chunkDataWidthSize
-                )];
+            for (var i = 0; i < 8; ++i) {
+                cellValues[i] = voxelArray[RegularCornerIndex(ref tables, cellPos, padding, lodScale,
+                    chunkDataAreaSize, chunkDataWidthSize, i)];
+                caseCode |= CaseCodeBit(cellValues[i], i);
             }
 
-            return (byte)((cellValues[0].Density >= 0 ? 0x01 : 0)
-                          | (cellValues[1].Density >= 0 ? 0x02 : 0)
-                          | (cellValues[2].Density >= 0 ? 0x04 : 0)
-                          | (cellValues[3].Density >= 0 ? 0x08 : 0)
-                          | (cellValues[4].Density >= 0 ? 0x10 : 0)
-                          | (cellValues[5].Density >= 0 ? 0x20 : 0)
-                          | (cellValues[6].Density >= 0 ? 0x40 : 0)
-                          | (cellValues[7].Density >= 0 ? 0x80 : 0));
+            return (byte)caseCode;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static byte GatherRegularCornersAndComputeCaseCode(
+            in NativeArray<VoxelData> voxelArray,
+            ref McTablesBlobAsset tables,
+            int3 cellPos,
+            int padding,
+            int lodScale,
+            int chunkDataAreaSize,
+            int chunkDataWidthSize,
+            ref FixedList32Bytes<VoxelData> cellValues) {
+            var caseCode = 0;
+            cellValues.Clear();
+
+            for (var i = 0; i < 8; ++i) {
+                cellValues.Add(voxelArray[RegularCornerIndex(ref tables, cellPos, padding, lodScale,
+                    chunkDataAreaSize, chunkDataWidthSize, i)]);
+                caseCode |= CaseCodeBit(cellValues[i], i);
+            }
+
+            return (byte)caseCode;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static int RegularCornerIndex(
+            ref McTablesBlobAsset tables,
+            int3 cellPos,
+            int padding,
+            int lodScale,
+            int chunkDataAreaSize,
+            int chunkDataWidthSize,
+            int corner) {
+            var voxelPosition = cellPos + new int3(padding, padding, padding) +
+                                tables.RegularCornerOffset[corner] * lodScale;
+
+            return GfStaticHelper.Coord3DToIndex(
+                voxelPosition.x, voxelPosition.y, voxelPosition.z,
+                chunkDataAreaSize, chunkDataWidthSize
+            );
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static int CaseCodeBit(in VoxelData corner, int cornerIndex) {
+            return corner.Density >= 0 ? 1 << cornerIndex : 0;
         }
 
         /// <summary>

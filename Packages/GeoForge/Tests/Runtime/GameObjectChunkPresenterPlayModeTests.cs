@@ -105,10 +105,9 @@ namespace Spellbound.GeoForge.Tests {
                 manager = managerObject.AddComponent<GeoForgeManager>();
                 manager.LeafPrefab = Load<GameObject>(ManagerPrefabPath).GetComponent<GeoForgeManager>().LeafPrefab;
                 manager.materialDatabase = Load<GameObject>(ManagerPrefabPath).GetComponent<GeoForgeManager>().materialDatabase;
+                manager.jobAndRenderProfile = Load<MaterialRenderingProfile>(RenderingProfilePath);
                 managerObject.SetActive(true);
             }
-
-            manager.jobAndRenderProfile = Load<MaterialRenderingProfile>(RenderingProfilePath);
 
             Assert.IsInstanceOf<GameObjectChunkPresenter>(manager.Presenter);
 

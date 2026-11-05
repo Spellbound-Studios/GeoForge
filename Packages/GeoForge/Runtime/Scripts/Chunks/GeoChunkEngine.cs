@@ -1,10 +1,11 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
 using System.Collections.Generic;
 using Spellbound.Core.Tooling;
 using Unity.Collections;
 using Unity.Jobs;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Spellbound.GeoForge {
@@ -332,9 +333,36 @@ namespace Spellbound.GeoForge {
             if (_mcManager.TryGetResidentVoxelArray(config.ChunkSize, this, out var denseVoxels))
                 return denseVoxels[index];
 
-            var sparseIndex = GfStaticHelper.BinarySearchVoxelData(index, config.ChunkDataVolumeSize, _sparseVoxels);
+            return GetSparseVoxelData(index, config.ChunkDataVolumeSize);
+        }
 
-            return _sparseVoxels[sparseIndex].Voxel;
+        internal SurfaceCase ComputeSurfaceCase(Vector3Int cellOrigin, ref McTablesBlobAsset tables) {
+            ref var config = ref ParentGeoVolume.ConfigBlob.Value;
+            var chunkSpaceOrigin = cellOrigin - ChunkCoord * config.ChunkSize;
+            var cellPosition = new int3(chunkSpaceOrigin.x, chunkSpaceOrigin.y, chunkSpaceOrigin.z);
+            var corners = new FixedList32Bytes<VoxelData>();
+
+            if (_mcManager.TryGetResidentVoxelArray(config.ChunkSize, this, out var denseVoxels)) {
+                var denseCaseCode = GfMarchHelper.GatherRegularCornersAndComputeCaseCode(denseVoxels, ref tables,
+                    cellPosition, 0, 1, config.ChunkDataAreaSize, config.ChunkDataWidthSize, ref corners);
+
+                return SurfaceCases.FromCorners(cellOrigin, denseCaseCode, corners);
+            }
+
+            var caseCode = 0;
+
+            for (var corner = 0; corner < SurfaceCase.CornerCount; corner++) {
+                var index = GfMarchHelper.RegularCornerIndex(ref tables, cellPosition, 0, 1, config.ChunkDataAreaSize,
+                    config.ChunkDataWidthSize, corner);
+                corners.Add(GetSparseVoxelData(index, config.ChunkDataVolumeSize));
+                caseCode |= GfMarchHelper.CaseCodeBit(corners[corner], corner);
+            }
+
+            return SurfaceCases.FromCorners(cellOrigin, (byte)caseCode, corners);
+        }
+
+        private VoxelData GetSparseVoxelData(int index, int chunkDataVolumeSize) {
+            return _sparseVoxels[GfStaticHelper.BinarySearchVoxelData(index, chunkDataVolumeSize, _sparseVoxels)].Voxel;
         }
 
         public VoxelData GetVoxelDataFromVoxelPosition(Vector3Int position) {

@@ -2,9 +2,11 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Spellbound.GeoForge.Presentation;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Spellbound.GeoForge.Tests {
     public class GameObjectChunkPresenterTests {
@@ -37,19 +39,17 @@ namespace Spellbound.GeoForge.Tests {
 
         [Test]
         public void AcquiredLeavesTakeTheMeshAndReleasedLeavesAreReused() {
-            var first = _presenter.Acquire(_chunk, 0);
-            var second = _presenter.Acquire(_chunk, 1);
-            var firstObjects = ObjectsOf(first);
-            var secondObjects = ObjectsOf(second);
+            var first = Acquire(0, out var firstObjects);
+            var second = Acquire(1, out var secondObjects);
 
-            Assert.AreSame(_chunk, first.Transform.parent);
-            Assert.AreSame(first.Transform, firstObjects[1].transform.parent);
+            Assert.AreSame(_chunk, firstObjects[0].transform.parent);
+            Assert.AreSame(firstObjects[0].transform, firstObjects[1].transform.parent);
             CollectionAssert.IsEmpty(firstObjects.Intersect(secondObjects));
 
             var mesh = Track(CreateTriangleMesh());
             first.SetMesh(mesh, 2);
 
-            var leafObject = first.Transform.gameObject;
+            var leafObject = firstObjects[0];
             Assert.AreSame(mesh, leafObject.GetComponent<MeshFilter>().sharedMesh);
             Assert.AreSame(mesh, leafObject.GetComponent<MeshCollider>().sharedMesh);
             var behaviour = leafObject.GetComponent<RecordingLeafBehaviour>();
@@ -68,13 +68,13 @@ namespace Spellbound.GeoForge.Tests {
                 Assert.AreSame(_manager.transform, released.transform.parent.parent);
             }
 
-            var third = _presenter.Acquire(_chunk, 0);
-            var fourth = _presenter.Acquire(_chunk, 0);
-            var reused = ObjectsOf(third).Concat(ObjectsOf(fourth)).ToArray();
+            Acquire(0, out var thirdObjects);
+            Acquire(0, out var fourthObjects);
+            var reused = thirdObjects.Concat(fourthObjects).ToArray();
 
             CollectionAssert.AreEquivalent(firstObjects.Concat(secondObjects), reused);
-            Assert.AreSame(_chunk, third.Transform.parent);
-            Assert.AreSame(_chunk, fourth.Transform.parent);
+            Assert.AreSame(_chunk, thirdObjects[0].transform.parent);
+            Assert.AreSame(_chunk, fourthObjects[0].transform.parent);
 
             foreach (var acquired in reused)
                 Assert.IsTrue(acquired.activeSelf);
@@ -82,20 +82,51 @@ namespace Spellbound.GeoForge.Tests {
 
         [Test]
         public void TheVolumeMatrixReachesBothRenderers() {
-            var leaf = _presenter.Acquire(_chunk, 0);
+            var leaf = Acquire(0, out var leafObjects);
             var worldToLocal = Matrix4x4.TRS(new Vector3(1f, 2f, 3f), Quaternion.identity, Vector3.one);
 
             leaf.SetVolumeMatrix(worldToLocal);
 
-            foreach (var leafPart in ObjectsOf(leaf)) {
+            foreach (var leafPart in leafObjects) {
                 var block = new MaterialPropertyBlock();
                 leafPart.GetComponent<MeshRenderer>().GetPropertyBlock(block);
                 Assert.AreEqual(worldToLocal, block.GetMatrix("_WorldToLocal"));
             }
         }
 
-        private static GameObject[] ObjectsOf(IChunkLeaf leaf) {
-            return new[] { leaf.Transform.gameObject, leaf.Transform.GetChild(0).gameObject };
+        [Test]
+        public void AManagerWithoutALeafPrefabRefusesOnceAndHandsOutNoLeaf() {
+            _manager.LeafPrefab = null;
+            LogAssert.Expect(LogType.Error,
+                new Regex(Regex.Escape(_manager.name) + ".*" + nameof(GeoForgeManager.LeafPrefab)));
+
+            Assert.IsNull(_presenter.Acquire(_chunk, 0));
+            Assert.IsNull(_presenter.Acquire(_chunk, 1));
+            LogAssert.NoUnexpectedReceived();
+            Assert.AreEqual(0, _chunk.childCount);
+        }
+
+        [Test]
+        public void AcquiredLeavesAreNamedFromTheirLevelOfDetailInTheOrderHandedOut() {
+            Acquire(2, out var firstObjects);
+            Acquire(0, out var secondObjects);
+
+            Assert.AreEqual("Leaf 1 at level of detail 2", firstObjects[0].name);
+            Assert.AreEqual("Leaf 1 at level of detail 2 Transition", firstObjects[1].name);
+            Assert.AreEqual("Leaf 2 at level of detail 0", secondObjects[0].name);
+            Assert.AreEqual("Leaf 2 at level of detail 0 Transition", secondObjects[1].name);
+        }
+
+        private IChunkLeaf Acquire(int levelOfDetail, out GameObject[] leafObjects) {
+            var childCount = _chunk.childCount;
+            var leaf = _presenter.Acquire(_chunk, levelOfDetail);
+
+            Assert.AreEqual(childCount + 1, _chunk.childCount);
+            var leafTransform = _chunk.GetChild(childCount);
+            Assert.AreEqual(1, leafTransform.childCount);
+            leafObjects = new[] { leafTransform.gameObject, leafTransform.GetChild(0).gameObject };
+
+            return leaf;
         }
 
         private GameObject CreateLeafTemplate() {

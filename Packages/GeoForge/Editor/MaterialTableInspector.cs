@@ -17,7 +17,6 @@ namespace Spellbound.GeoForge.Materials.Editor {
         public const string ValidateButtonClassName = ClassName + "__validate";
         public const string StatusClassName = ClassName + "__status";
         public const string ProblemsClassName = ClassName + "__problems";
-        public const string ProblemClassName = ClassName + "__problem";
         public const string DatabaseCardTitle = "Material Database";
         public const string SyncText = "Sync";
         public const string ValidateText = "Validate";
@@ -93,9 +92,12 @@ namespace Spellbound.GeoForge.Materials.Editor {
             _status.State = HeaderStates.Error;
 
             foreach (var problem in problems) {
-                var row = new Label(problem);
-                row.AddToClassList(ProblemClassName);
-                row.style.whiteSpace = WhiteSpace.Normal;
+                var row = new VisualElement();
+                row.AddToClassList(ReportView.FindingClassName);
+                row.AddToClassList(ReportView.ErrorClassName);
+                var message = new Label(problem);
+                message.AddToClassList(ReportView.MessageClassName);
+                row.Add(message);
                 _problems.Add(row);
             }
         }

@@ -11,13 +11,18 @@ namespace Spellbound.GeoForge.Tests {
 
         internal List<IChunkLeaf> Released { get; } = new();
 
+        internal bool HandsOutLeaves { get; set; } = true;
+
         public IChunkLeaf Acquire(Transform parent, int levelOfDetail) {
             Calls.Add(nameof(Acquire));
+
+            if (!HandsOutLeaves)
+                return null;
 
             var leafObject = new GameObject("Recorded Leaf");
             leafObject.transform.SetParent(parent, false);
 
-            var leaf = new RecordingChunkLeaf(leafObject.transform, parent, levelOfDetail, Calls);
+            var leaf = new RecordingChunkLeaf(leafObject, parent, levelOfDetail, Calls);
             Acquired.Add(leaf);
 
             return leaf;
@@ -26,7 +31,7 @@ namespace Spellbound.GeoForge.Tests {
         public void Release(IChunkLeaf leaf) {
             Calls.Add(nameof(Release));
             Released.Add(leaf);
-            Object.DestroyImmediate(leaf.Transform.gameObject);
+            Object.DestroyImmediate(((RecordingChunkLeaf)leaf).LeafObject);
         }
     }
 }

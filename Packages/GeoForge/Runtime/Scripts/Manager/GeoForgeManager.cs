@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -40,9 +40,6 @@ namespace Spellbound.GeoForge {
             set => _presenter = value;
         }
 
-        // Internal: raw MC lookup tables, only ever consumed by the march jobs via
-        // profile.ScheduleMarchingCubes(_gfManager.McTablesBlob, ...) - no external caller needs
-        // direct access to the table blob itself.
         internal BlobAssetReference<McTablesBlobAsset> McTablesBlob { get; private set; }
 
         private void Awake() {
@@ -84,20 +81,12 @@ namespace Spellbound.GeoForge {
                 kvp.Value.Dispose();
         }
 
-        // Judgment call, leaning public: reads as a legitimate external status-check API ("is
-        // GeoForge ready") rather than internal plumbing, though nothing in what I've seen this
-        // session actually calls it - worth confirming it's still wanted at all before deciding
-        // its visibility.
         public bool IsActive() {
             return _isActive;
         }
 
-        // Internal: purely an internal coordination mechanism between this manager and OctreeNode
-        // (HandleTransitionUpdate subscribes/unsubscribes to this) - not a public event story.
         internal event Action OctreeBatchTransitionUpdate;
 
-        // Internal: called once from Awake() and drives its own infinite validation loop - no
-        // legitimate reason for external code to invoke this a second time.
         internal async void ValidateAllVolumesLodsAsync() {
             try {
                 while (true) {
@@ -117,9 +106,6 @@ namespace Spellbound.GeoForge {
             }
         }
 
-        // Left public: IGeoVolume is a public extension point (a custom volume implementation
-        // outside this assembly needs to be able to register/unregister itself), so these two
-        // can't be narrowed the way the rest of this file was.
         public void RegisterVoxelVolume(IGeoVolume geoVolume) {
             _voxelVolumes.Add(geoVolume);
             var chunkSize = geoVolume.ConfigBlob.Value.ChunkSize;
@@ -281,9 +267,6 @@ namespace Spellbound.GeoForge {
         ///     as "voxel is default/empty"; it means "nothing was actually queryable here."
         ///     queryVolume is only ever set on a true return, never left pointing at a volume whose
         ///     data wasn't actually used.
-        ///     Judgment call, leaning public: a safe, read-only gameplay query (checking terrain at a
-        ///     position) rather than lifecycle/pooling machinery - doesn't have the same clear
-        ///     "route through GeoForgeStatic" signal ExecuteTerraformAll/DistributeVoxelEdits have.
         /// </summary>
         public bool TryQueryVoxel(Vector3 position, out VoxelData voxel, out IGeoVolume queryVolume) {
             voxel = default;
