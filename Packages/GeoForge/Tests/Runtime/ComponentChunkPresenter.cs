@@ -13,35 +13,26 @@ namespace Spellbound.GeoForge.Tests {
             var leafObject = new GameObject("Component Leaf");
             leafObject.transform.SetParent(parent, false);
 
-            return new Leaf(leafObject.transform);
+            return new Leaf(leafObject);
         }
 
         public void Release(IChunkLeaf leaf) {
             Released++;
-            Object.DestroyImmediate(leaf.Transform.gameObject);
+            Object.DestroyImmediate(((Leaf)leaf).LeafObject);
         }
 
         private sealed class Leaf : IChunkLeaf {
-            public Leaf(Transform transform) {
-                Transform = transform;
+            public Leaf(GameObject leafObject) {
+                LeafObject = leafObject;
             }
 
-            public Transform Transform { get; }
-
-            public string Name {
-                get => Transform.name;
-                set => Transform.name = value;
-            }
+            public GameObject LeafObject { get; }
 
             public void SetMesh(Mesh mesh, int levelOfDetail) { }
 
             public void SetTransitionMesh(Mesh mesh) { }
 
             public void SetVolumeMatrix(Matrix4x4 worldToLocal) { }
-
-            public void SetVisible(bool visible) {
-                Transform.gameObject.SetActive(visible);
-            }
         }
     }
 }

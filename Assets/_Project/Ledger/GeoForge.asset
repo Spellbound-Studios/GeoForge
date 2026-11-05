@@ -13,14 +13,6 @@ MonoBehaviour:
   m_Name: GeoForge
   m_EditorClassIdentifier: Spellbound.PackageCheck.Editor::Spellbound.PackageCheck.PackageLedger
   waivers:
-  - rule: I2
-    revision: 1
-    subjects:
-    - package.json#7c5876ed
-    reason: The author address is the old organisation name; GeoForge#107 points
-      every link at Spellbound-Studios.
-    endsAt: 1.0.0
-    handle: pipeline
   - rule: I5
     revision: 1
     subjects:

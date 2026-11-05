@@ -12,7 +12,7 @@ namespace Spellbound.GeoForge.Tests {
 
         public GeoVolumeEngine GeoVolumeEngine => null;
 
-        public Vector2[] ViewDistanceLodRanges => Array.Empty<Vector2>();
+        public Vector2[] ViewDistanceLodRanges { get; set; } = Array.Empty<Vector2>();
 
         public Transform LodTarget => null;
 

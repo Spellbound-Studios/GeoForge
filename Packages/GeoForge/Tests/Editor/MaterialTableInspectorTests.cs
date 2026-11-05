@@ -158,6 +158,33 @@ namespace Spellbound.GeoForge.Tests {
             return names;
         }
 
+        [Test]
+        public void AProblemRowIsTheKitsErrorFindingRow() {
+            var inspector = CreateInspector(CreateTable(null));
+            var root = inspector.CreateInspectorGUI();
+            LogAssert.Expect(LogType.Error, new Regex(Regex.Escape(NoDatabaseProblem)));
+
+            inspector.ValidateTable();
+
+            var rows = root.Query<VisualElement>(className: ReportView.FindingClassName).ToList();
+            Assert.AreEqual(1, rows.Count);
+            Assert.IsTrue(rows[0].ClassListContains(ReportView.ErrorClassName));
+            var message = rows[0].Q<Label>(className: ReportView.MessageClassName);
+            Assert.IsNotNull(message);
+            Assert.AreEqual(NoDatabaseProblem, message.text);
+            CollectionAssert.Contains(StyleSheetsOf(root), ControlStyleSheet.Default);
+        }
+
+        private static List<StyleSheet> StyleSheetsOf(VisualElement element) {
+            var sheets = new List<StyleSheet>();
+
+            for (var index = 0; index < element.styleSheets.count; index++) {
+                sheets.Add(element.styleSheets[index]);
+            }
+
+            return sheets;
+        }
+
         private static List<string> BindingPaths(VisualElement root) {
             var paths = new List<string>();
 
@@ -177,8 +204,8 @@ namespace Spellbound.GeoForge.Tests {
         private static List<string> ProblemTexts(VisualElement root) {
             var texts = new List<string>();
 
-            foreach (var row in root.Query<Label>(className: MaterialTableInspector.ProblemClassName).ToList()) {
-                texts.Add(row.text);
+            foreach (var row in root.Query<VisualElement>(className: ReportView.FindingClassName).ToList()) {
+                texts.Add(row.Q<Label>(className: ReportView.MessageClassName).text);
             }
 
             return texts;

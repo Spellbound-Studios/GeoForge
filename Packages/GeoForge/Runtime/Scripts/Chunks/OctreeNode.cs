@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
 using Spellbound.Core.Tooling;
@@ -26,15 +26,10 @@ namespace Spellbound.GeoForge {
         private OctreeNode[] _children;
         private NativeList<int> _filteredTransitionTriangles;
         private IChunkLeaf _leaf;
-
-        // True once this node has been evaluated as a leaf (MakeLeaf has run at least once since
-        // the last Subdivide) - independent of whether _leaf actually exists. A leaf whose
-        // geometry marches to zero triangles never gets a presented leaf at all (see ApplyMarchResults),
-        // but still needs to be recognized as "already handled" so ValidateOctreeLods doesn't
-        // re-schedule a march job for it every single validation pass.
         private bool _leafInitialized;
         private bool _awaitsPresenter;
         private IChunkPresenter _leafPresenter;
+        private IChunkPresenter _refusingPresenter;
         private Mesh _mesh;
         private bool _transitionDirtyFlag;
         private int _transitionMask;
@@ -77,9 +72,6 @@ namespace Spellbound.GeoForge {
             if (_transitionRanges.IsCreated)
                 _transitionRanges.Dispose();
 
-            // Unconditional: covers non-leaf/parent nodes too, where ReleaseLeafObjects above is a
-            // no-op (it only unsubscribes when _leaf != null). Safe to call twice - event -= is
-            // always a no-op if not currently subscribed.
             _gfManager.OctreeBatchTransitionUpdate -= HandleTransitionUpdate;
         }
 
@@ -177,6 +169,12 @@ namespace Spellbound.GeoForge {
             foreach (var child in _children) child.ValidateMaterial();
         }
 
+        private bool HasPresenterToAsk() {
+            var presenter = _gfManager.Presenter;
+
+            return presenter != null && presenter != _refusingPresenter;
+        }
+
         private void SetMaterialOrigin() {
             _leaf.SetVolumeMatrix(_parentGeoVolume.VolumeTransform.worldToLocalMatrix);
         }
@@ -197,12 +195,10 @@ namespace Spellbound.GeoForge {
 
                 if (!_leafInitialized)
                     MakeLeaf(voxelArray);
-                else if (_awaitsPresenter && _gfManager.Presenter != null) {
+                else if (_awaitsPresenter && HasPresenterToAsk()) {
                     _awaitsPresenter = false;
                     MarchAndMesh(voxelArray);
                 }
-
-                _leaf?.SetVisible(true);
 
                 return;
             }
@@ -277,7 +273,9 @@ namespace Spellbound.GeoForge {
         }
 
         private void MarchAndMesh(NativeArray<VoxelData> voxelArray) {
-            var profile = _gfManager.jobAndRenderProfile;
+            if (!_gfManager.TryGetRenderingProfile(out var profile))
+                return;
+
             var start = new int3(_localPosition.x, _localPosition.y, _localPosition.z);
 
             // Rented from GeoForgeManager's buffer pool instead of freshly allocated - avoids the
@@ -399,17 +397,25 @@ namespace Spellbound.GeoForge {
                 _transitionRanges = new NativeArray<int2>(6, Allocator.Persistent);
         }
 
-        private void BuildLeaf(IChunkPresenter presenter) {
-            _leafPresenter = presenter;
-            _leaf = presenter.Acquire(_geoChunk.GeoChunkEngine.Transform, _lod);
+        private bool TryBuildLeaf(IChunkPresenter presenter) {
+            var leaf = presenter.Acquire(_geoChunk.GeoChunkEngine.Transform, _lod);
 
-            _leaf.Name = $"LeafSize {_parentGeoVolume.ConfigBlob.Value.CubesMarchedPerOctreeLeaf << _lod} " +
-                         $"at {_localPosition.x}, {_localPosition.y}, {_localPosition.z}";
+            if (leaf == null) {
+                _refusingPresenter = presenter;
+
+                return false;
+            }
+
+            _refusingPresenter = null;
+            _leafPresenter = presenter;
+            _leaf = leaf;
 
             DestroyMesh(ref _mesh);
 
             _mesh = new Mesh();
             _mesh.MarkDynamic();
+
+            return true;
         }
 
         private void UpdateTransitionVertexBuffer(NativeList<MeshingVertexData> vertices) {
@@ -470,6 +476,7 @@ namespace Spellbound.GeoForge {
             _transitionMesh.subMeshCount = 1;
 
             _transitionMesh.SetSubMesh(0, subMesh);
+            _leaf.SetTransitionMesh(_transitionMesh);
             // No RecalculateBounds() here - bounds are set once in ApplyTransitionMarchResults,
             // when the vertex buffer actually changes. This method also runs on mask-only changes
             // where the vertex buffer is untouched, so recomputing here would be redundant.
@@ -564,14 +571,13 @@ namespace Spellbound.GeoForge {
             if (isFirstBuild) {
                 var presenter = _gfManager.Presenter;
 
-                if (presenter == null) {
+                if (presenter == null || !TryBuildLeaf(presenter)) {
                     _awaitsPresenter = true;
 
                     return;
                 }
 
                 _awaitsPresenter = false;
-                BuildLeaf(presenter);
                 BuildTransitions();
                 SetMaterialOrigin();
             }
