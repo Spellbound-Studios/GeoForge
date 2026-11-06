@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System.Collections.Generic;
 using UnityEngine;
@@ -105,7 +105,7 @@ namespace Spellbound.Sample4 {
                         GeoForgeCommands.RemoveSphere(
                             iVolume,
                             hit.point,   // worldPosition - sphere centers here
-                            radius: terraformSize, // world units, same convention as GeoForgeStatic.RemoveSphere's radius
+                            radius: terraformSize, // world units
                             delta: terraformStrength,    // magnitude to subtract - RemoveSphere negates this internally
                             allowedMaterialsMask: digMaskDefinition.GetMask()
                         );
@@ -147,7 +147,7 @@ namespace Spellbound.Sample4 {
                         GeoForgeCommands.RemoveSphere(
                             iVolume,
                             hit.point,   // worldPosition - sphere centers here
-                            radius: terraformSize, // world units, same convention as GeoForgeStatic.RemoveSphere's radius
+                            radius: terraformSize, // world units
                             delta: terraformStrength,    // magnitude to subtract - RemoveSphere negates this internally
                             allowedMaterialsMask: digMaskDefinition.GetMask()
                         );

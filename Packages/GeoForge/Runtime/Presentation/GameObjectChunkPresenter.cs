@@ -22,7 +22,8 @@ namespace Spellbound.GeoForge.Presentation {
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         private static void RegisterAsDefault() {
-            ChunkPresenterDefaults.Factory = manager => manager.gameObject.AddComponent<GameObjectChunkPresenter>();
+            ChunkPresenterDefaults.RegisterDefault(
+                manager => manager.gameObject.AddComponent<GameObjectChunkPresenter>());
         }
 
         private void Awake() {

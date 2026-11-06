@@ -1,6 +1,5 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
-using Unity.Entities;
 using UnityEngine;
 
 namespace Spellbound.GeoForge {
@@ -22,11 +21,8 @@ namespace Spellbound.GeoForge {
             GeoChunkEngine.IGeoEditStore.geoChunkEngine = GeoChunkEngine;
         }
 
-        void IGeoChunk.SetVoxels(
-            Vector3Int chunkCoord,
-            BlobAssetReference<VolumeConfigBlobAsset> configBlobAsset,
-            GeoForgeDataGenerator geoDataGenerator) {
-            GeoChunkEngine.SetVoxels(geoDataGenerator.GenerateProceduralVoxels(chunkCoord, configBlobAsset));
+        void IGeoChunk.SetVoxels(in ChunkFillRequest request, IDensitySource source) {
+            GeoChunkEngine.SetVoxels(request, source);
 
             OnVoxelsSet();
         }

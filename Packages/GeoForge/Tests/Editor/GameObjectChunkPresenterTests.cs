@@ -51,7 +51,7 @@ namespace Spellbound.GeoForge.Tests {
 
             var leafObject = firstObjects[0];
             Assert.AreSame(mesh, leafObject.GetComponent<MeshFilter>().sharedMesh);
-            Assert.AreSame(mesh, leafObject.GetComponent<MeshCollider>().sharedMesh);
+            Assert.IsNull(leafObject.GetComponent<MeshCollider>().sharedMesh);
             var behaviour = leafObject.GetComponent<RecordingLeafBehaviour>();
             Assert.AreEqual(1, behaviour.MeshUpdates);
             Assert.AreEqual(2, behaviour.LastLevelOfDetail);

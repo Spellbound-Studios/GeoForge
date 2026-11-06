@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Spellbound Studio Inc.
+﻿// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -41,7 +41,7 @@ namespace Spellbound.GeoForge {
                 if (!_chunkData.TryReadEdit(voxelDelta.Index, out var voxelData))
                     voxelData = geoChunkEngine.GetVoxelData(voxelDelta.Index);
 
-                var wasFull = voxelData.Density >= 0;
+                var wasFull = VoxelEncoding.IsSolid(voxelData.Density);
                 var wasMature = voxelData.IsMature();
                 var existingMatIndex = voxelData.GetPlainMatIndex();
 
@@ -57,7 +57,7 @@ namespace Spellbound.GeoForge {
                     sbyte.MinValue,
                     sbyte.MaxValue);
 
-                var isFull = density >= 0;
+                var isFull = VoxelEncoding.IsSolid(density);
 
                 byte matIndex;
                 bool isMature;
@@ -102,6 +102,8 @@ namespace Spellbound.GeoForge {
 
             NotifyGeoEditsChanged(changes);
         }
+
+        public bool HasEdits => _chunkData.EditCount > 0;
 
         public IEnumerable<(int, VoxelData)> ReadAllEdits() {
             foreach (var (idx, voxelData) in _chunkData.Edits)

@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f44d5d6cb867c442a555643cdaeecc9, type: 3}
+  m_Name: SpellboundLine
+  m_EditorClassIdentifier: Spellbound.PackageCheck.Editor::Spellbound.PackageCheck.PackageCheckValues
+  namePrefix: Spellbound.
+  identifierPrefix: com.spellboundstudios.
+  foundationPackage: com.spellboundstudios.core
+  foundationAssembly: Spellbound.Core
+  foundationDefine: SPELLBOUND_CORE
+  foundationLogger: Spellbound.Core.Logging.Log
+  foundationAddress: https://github.com/Spellbound-Studios/Core.git?path=/Packages/Core#dev
+  foundationAppDomainTypes:
+  - Spellbound.Core.Tooling.AssemblyScanning
+  - Spellbound.Core.Logging.FileSink
+  organisationAddress: https://github.com/Spellbound-Studios/
+  lineTextAddress: https://github.com/Spellbound-Studios/.github/tree/main/line
+  floorEditor: 6000.3
+  ledgerFolder: Assets/_Project/Ledger
+  scaffoldFolder: Assets/_Project
+  copyrightLine: // Copyright (c) Spellbound Studios. All rights reserved.
+  depthBudget: 4
+  readTierBudgetMilliseconds: 1000
+  testAssemblies:
+  - UnityEngine.TestRunner
+  - UnityEditor.TestRunner
+  - Unity.PerformanceTesting
+  - Unity.UI.TestFramework.Runtime
+  - Unity.UI.TestFramework.Editor
+  presentationTypes:
+  - UnityEngine.UIElements
+  - UIDocument
+  - PanelSettings
+  - VisualElement
+  - UnityEngine.Rendering
+  - Camera
+  - Renderer
+  - MeshRenderer
+  - SkinnedMeshRenderer
+  - LineRenderer
+  - AudioSource
+  - Canvas
+  engineModulePackages:
+  - com.unity.burst 6000.6
+  - com.unity.mathematics 6000.6
+  - com.unity.cinemachine 6000.6
+  - com.unity.test-framework.performance 6000.6
+  - com.unity.collections 6000.7
+  maintainerFiles:
+  - CLAUDE.md
+  - claude.md
+  - .claude
+  lineTextHeadings:
+  - Rules of the line
+  - The homes procedure
+  layerOrder:
+  - foundation
+  - mechanism
+  - composer
+  - tool
+  - studio

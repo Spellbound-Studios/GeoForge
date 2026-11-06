@@ -21,7 +21,7 @@ namespace Spellbound.GeoForge.Tests {
 
         [SetUp]
         public void SetUp() {
-            _tables = McTablesBlobCreator.CreateMcTablesBlobAsset();
+            _tables = MarchTables.Build(Allocator.Persistent);
             _voxels = new NativeArray<VoxelData>(Width * Area, Allocator.Persistent);
         }
 

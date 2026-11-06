@@ -1,7 +1,11 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
+using System;
+using Spellbound.Core.Logging;
+using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace Spellbound.GeoForge {
     public interface IGeoVolume {
@@ -18,11 +22,6 @@ namespace Spellbound.GeoForge {
         Vector2[] ViewDistanceLodRanges { get; }
 
         /// <summary>
-        ///     Target that the view distances are calculated from. Camera.Main is a good candidate for this.
-        /// </summary>
-        Transform LodTarget { get; }
-
-        /// <summary>
         ///     Indication of if the Volume is moving or is capable of moving, or if not.
         /// </summary>
         bool IsMoving { get; set; }
@@ -37,57 +36,144 @@ namespace Spellbound.GeoForge {
         #region Default Implmentations
 
         bool TryQueryVoxel(Vector3 worldPosition, out VoxelData voxel) {
-            return GeoVolumeEngine.TryQueryVoxel(worldPosition, out voxel);
+            voxel = default;
+
+            return GeoVolumeEngine != null && GeoVolumeEngine.TryQueryVoxel(worldPosition, out voxel);
         }
 
         bool TryQuerySurfaceMaterial(Vector3 worldPosition, out byte materialIndex) {
-            return GeoVolumeEngine.TryQuerySurfaceMaterial(worldPosition, out materialIndex);
+            materialIndex = default;
+
+            return GeoVolumeEngine != null && GeoVolumeEngine.TryQuerySurfaceMaterial(worldPosition, out materialIndex);
         }
 
         bool TryQuerySurfaceCase(Vector3 worldPosition, out SurfaceCase surfaceCase) {
-            return GeoVolumeEngine.TryQuerySurfaceCase(worldPosition, out surfaceCase);
+            surfaceCase = default;
+
+            return GeoVolumeEngine != null && GeoVolumeEngine.TryQuerySurfaceCase(worldPosition, out surfaceCase);
+        }
+
+        IChunkInterest ChunkInterest {
+            get => GeoVolumeEngine?.ChunkInterest;
+            set {
+                if (GeoVolumeEngine != null)
+                    GeoVolumeEngine.ChunkInterest = value;
+            }
+        }
+
+        void SetViewers(ReadOnlySpan<ChunkViewer> viewers) {
+            GeoVolumeEngine?.SetViewers(viewers);
+        }
+
+        IDensitySource DensitySource => GeoVolumeEngine?.DensitySource;
+
+        void UseDensitySource(IDensitySource source) {
+            GeoVolumeEngine?.UseDensitySource(source);
+        }
+
+        event Action<VolumeChange> Changed {
+            add {
+                if (GeoVolumeEngine != null)
+                    GeoVolumeEngine.Changed += value;
+                else
+                    RefuseSubscription(nameof(Changed));
+            }
+            remove {
+                if (GeoVolumeEngine != null)
+                    GeoVolumeEngine.Changed -= value;
+            }
+        }
+
+        event Action<ChunkResidency> ResidencyChanged {
+            add {
+                if (GeoVolumeEngine != null)
+                    GeoVolumeEngine.ResidencyChanged += value;
+                else
+                    RefuseSubscription(nameof(ResidencyChanged));
+            }
+            remove {
+                if (GeoVolumeEngine != null)
+                    GeoVolumeEngine.ResidencyChanged -= value;
+            }
+        }
+
+        bool TryQuerySolid(Vector3 worldPosition, out bool solid) {
+            solid = default;
+
+            return GeoVolumeEngine != null && GeoVolumeEngine.TryQuerySolid(worldPosition, out solid);
+        }
+
+        bool IsMeshReady(Vector3 worldPosition, ReadinessScope scope) {
+            return GeoVolumeEngine != null && GeoVolumeEngine.IsMeshReady(worldPosition, scope);
+        }
+
+        bool IsColliderReady(Vector3 worldPosition, ReadinessScope scope) {
+            return GeoVolumeEngine != null && GeoVolumeEngine.IsColliderReady(worldPosition, scope);
+        }
+
+        bool IsBoxReady(in Bounds worldBounds, ReadinessScope scope, out VolumeVersion version) {
+            version = default;
+
+            return GeoVolumeEngine != null && GeoVolumeEngine.IsBoxReady(worldBounds, scope, out version);
+        }
+
+        bool TryCopyRunList(
+            Vector3Int chunkCoordinate, NativeList<SparseVoxelData> destination, out VolumeVersion version) {
+            version = default;
+
+            return GeoVolumeEngine != null && GeoVolumeEngine.TryCopyRunList(chunkCoordinate, destination, out version);
+        }
+
+        bool TryCopySolidRuns(Vector3Int chunkCoordinate, NativeList<SolidRun> destination, out VolumeVersion version) {
+            version = default;
+
+            return GeoVolumeEngine != null &&
+                   GeoVolumeEngine.TryCopySolidRuns(chunkCoordinate, destination, out version);
         }
 
         void OnTerraform(Vector3 worldPosition, int voxelCount) { }
 
-        Transform VolumeTransform => GeoVolumeEngine.Transform;
+        Transform VolumeTransform => GeoVolumeEngine?.Transform;
 
         (Vector3, Quaternion) SnapToGrid(Vector3 pos) {
-            return GeoVolumeEngine.SnapToGrid(pos);
+            return GeoVolumeEngine?.SnapToGrid(pos) ?? (pos, Quaternion.identity);
         }
 
-        BlobAssetReference<VolumeConfigBlobAsset> ConfigBlob => GeoVolumeEngine.ConfigBlob;
+        BlobAssetReference<VolumeConfigBlobAsset> ConfigBlob => GeoVolumeEngine?.ConfigBlob ?? default;
 
         bool IntersectsVolume(Bounds voxelBounds) {
-            return GeoVolumeEngine.IntersectsVolume(voxelBounds);
+            return GeoVolumeEngine != null && GeoVolumeEngine.IntersectsVolume(voxelBounds);
         }
 
         async Awaitable ValidateChunkLods() {
+            if (GeoVolumeEngine == null)
+                return;
+
             await GeoVolumeEngine.ValidateChunkLodsAsync();
         }
 
         Vector3Int WorldToVoxelSpace(Vector3 worldPosition) {
-            return GeoVolumeEngine.WorldToVoxelSpace(worldPosition);
+            return GeoVolumeEngine?.WorldToVoxelSpace(worldPosition) ?? default;
         }
 
         Vector3 WorldToVoxelSpaceContinuous(Vector3 worldPosition) {
-            return GeoVolumeEngine.WorldToVoxelSpaceContinuous(worldPosition);
+            return GeoVolumeEngine?.WorldToVoxelSpaceContinuous(worldPosition) ?? default;
         }
 
         IGeoChunk GetChunkByCoord(Vector3Int coord) {
-            return GeoVolumeEngine.GetChunkByCoord(coord);
+            return GeoVolumeEngine?.GetChunkByCoord(coord);
         }
 
         IGeoChunk GetChunkByWorldPosition(Vector3 worldPos) {
-            return GeoVolumeEngine.GetChunkByWorldPosition(worldPos);
+            return GeoVolumeEngine?.GetChunkByWorldPosition(worldPos);
         }
 
         IGeoChunk GetChunkByVoxelPosition(Vector3Int voxelPos) {
-            return GeoVolumeEngine.GetChunkByVoxelPosition(voxelPos);
+            return GeoVolumeEngine?.GetChunkByVoxelPosition(voxelPos);
         }
 
         Vector3Int GetCoordByVoxelPosition(Vector3Int voxelPos) {
-            return GeoVolumeEngine.GetCoordByVoxelPosition(voxelPos);
+            return GeoVolumeEngine?.GetCoordByVoxelPosition(voxelPos) ?? default;
         }
 
         /// <summary>
@@ -95,7 +181,7 @@ namespace Spellbound.GeoForge {
         ///     GeoVolumeEngine.SaveToByteArray for the wire format and what gets skipped/included.
         /// </summary>
         byte[] SaveToByteArray() {
-            return GeoVolumeEngine.SaveToByteArray();
+            return GeoVolumeEngine?.SaveToByteArray();
         }
 
         /// <summary>
@@ -105,7 +191,13 @@ namespace Spellbound.GeoForge {
         ///     and how it handles a saved coordinate with no loaded chunk.
         /// </summary>
         bool TryLoadFromByteArray(byte[] data) {
-            return GeoVolumeEngine.TryLoadFromByteArray(data);
+            return GeoVolumeEngine != null && GeoVolumeEngine.TryLoadFromByteArray(data);
+        }
+
+        private void RefuseSubscription(string eventName) {
+            Log.Emit(LogLevel.Warning,
+                $"{eventName} was subscribed before the volume's {nameof(GeoVolumeEngine)} exists, so the " +
+                "subscription is refused; subscribe once the engine is created.", this as Object);
         }
 
         void ResetEditedChunksToProcedural();

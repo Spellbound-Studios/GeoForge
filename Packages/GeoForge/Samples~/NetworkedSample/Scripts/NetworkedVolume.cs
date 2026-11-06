@@ -1,8 +1,9 @@
-﻿// Copyright 2025 Spellbound Studio Inc.
+﻿// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
 using System.Collections;
 using PurrNet;
+using Spellbound.Core.Logging;
 using Spellbound.GeoForge;
 using Spellbound.GeoForge.Sample4;
 using UnityEngine;
@@ -25,6 +26,9 @@ namespace GeoForge.Sample4 {
 
         [Tooltip("Prefab for the Chunk the Volume will build itself from. Must Implement IChunk"), SerializeField]
         private GameObject chunkPrefab;
+
+        [Tooltip("The manager this volume belongs to"), SerializeField]
+        private GeoForgeManager manager;
 
         private GeoVolumeEngine _geoVolumeEngine;
 
@@ -57,7 +61,13 @@ namespace GeoForge.Sample4 {
                 return;
             }
 
-            _geoVolumeEngine = new GeoVolumeEngine(this, this, config);
+            if (manager == null) {
+                Log.Error($"{name}: no {nameof(GeoForgeManager)} is assigned, so nothing is built.", this);
+
+                return;
+            }
+
+            _geoVolumeEngine = new GeoVolumeEngine(this, this, config, manager);
         }
 
         protected override void OnSpawned(bool asServer) {
@@ -85,7 +95,8 @@ namespace GeoForge.Sample4 {
                 for (var y = 0; y < size.y; y++) {
                     for (var z = 0; z < size.z; z++) {
                         var chunkCoord = new Vector3Int(x, y, z) - offset;
-                        _geoVolumeEngine.CreateChunk<IGeoChunk, IGeoEditStore>(chunkCoord, chunkPrefab, new ExampleSyncModule());
+                        _geoVolumeEngine.CreateChunk<IGeoChunk, IGeoEditStore>(chunkCoord, chunkPrefab,
+                            new ExampleSyncModule());
                         yield return null;
                     }
                 }
@@ -116,11 +127,6 @@ namespace GeoForge.Sample4 {
         public void ResetEditedChunksToProcedural() {
             
         }
-
-        public Transform LodTarget =>
-                Camera.main == null
-                        ? FindAnyObjectByType<Camera>().transform
-                        : Camera.main.transform;
 
         public bool IsMoving {
             get => isMoving;

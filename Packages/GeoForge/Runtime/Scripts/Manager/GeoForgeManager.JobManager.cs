@@ -16,8 +16,14 @@ namespace Spellbound.GeoForge {
         private readonly Dictionary<OctreeNode, MarchJobData> _pendingMarchJobData = new();
         private readonly Dictionary<OctreeNode, TransitionMarchJobData> _pendingTransitionMarchJobData = new();
 
+        private readonly List<OctreeNode> _preparedNodes = new();
+
         private JobHandle _combinedJobHandle;
         private bool _refusedMissingRenderingProfile;
+
+        internal int MeshesBakedInLastApply { get; private set; }
+
+        internal bool IsApplyingMarchResults { get; private set; }
 
         internal bool TryGetRenderingProfile(out MaterialRenderingProfile profile) {
             profile = jobAndRenderProfile;
@@ -92,26 +98,102 @@ namespace Spellbound.GeoForge {
         internal void CompleteAndApplyMarchingCubesJobs() {
             if (_pendingMarchJobData.Count == 0 && _pendingTransitionMarchJobData.Count == 0) return;
 
-            _combinedJobHandle.Complete();
+            IsApplyingMarchResults = true;
 
-            // Main leaf results MUST be applied before transition results: ApplyMarchResults is
-            // what builds (or releases) each leaf's GameObject/Mesh/transition-Mesh in the first
-            // place, and ApplyTransitionMarchResults needs those to already exist (or to already
-            // know they don't) before it can safely write into them.
-            foreach (var kvp in _pendingMarchJobData) {
-                kvp.Key.ApplyMarchResults(kvp.Value.Vertices, kvp.Value.Triangles, kvp.Value.ComputedBounds.Value);
-                ReturnMarchBuffers(kvp.Value);
+            try {
+                _combinedJobHandle.Complete();
+
+                // Main leaf results MUST be applied before transition results: PrepareMarchResults is
+                // what builds (or releases) each leaf's GameObject/Mesh/transition-Mesh in the first
+                // place, and ApplyTransitionMarchResults needs those to already exist (or to already
+                // know they don't) before it can safely write into them.
+                foreach (var kvp in _pendingMarchJobData) {
+                    if (PrepareMarchResults(kvp.Key, kvp.Value))
+                        _preparedNodes.Add(kvp.Key);
+
+                    ReturnMarchBuffers(kvp.Value);
+                }
+
+                BakePreparedCollisionMeshes();
+
+                foreach (var node in _preparedNodes)
+                    PresentMarchResults(node);
+
+                foreach (var kvp in _pendingTransitionMarchJobData) {
+                    kvp.Key.ApplyTransitionMarchResults(kvp.Value.Vertices, kvp.Value.Triangles, kvp.Value.Ranges);
+                    ReturnTransitionBuffers(kvp.Value);
+                }
+            }
+            finally {
+                _preparedNodes.Clear();
+                _pendingMarchJobData.Clear();
+                _pendingTransitionMarchJobData.Clear();
+                _nodeToChunkCoord.Clear();
+                _combinedJobHandle = default;
+                IsApplyingMarchResults = false;
             }
 
-            foreach (var kvp in _pendingTransitionMarchJobData) {
-                kvp.Key.ApplyTransitionMarchResults(kvp.Value.Vertices, kvp.Value.Triangles, kvp.Value.Ranges);
-                ReturnTransitionBuffers(kvp.Value);
+            FlushDeferredVolumeEvents();
+        }
+
+        private bool PrepareMarchResults(OctreeNode node, MarchJobData data) {
+            try {
+                return node.PrepareMarchResults(data.Vertices, data.Triangles, data.ComputedBounds.Value);
+            }
+            catch (Exception exception) {
+                Log.Error($"{name}: preparing a march result threw: {exception}", this);
+
+                return false;
+            }
+        }
+
+        private void PresentMarchResults(OctreeNode node) {
+            try {
+                node.PresentMarchResults();
+            }
+            catch (Exception exception) {
+                Log.Error($"{name}: presenting a march result threw: {exception}", this);
+            }
+        }
+
+        private void FlushDeferredVolumeEvents() {
+            if (_voxelVolumes.Count == 0)
+                return;
+
+            var volumes = new IGeoVolume[_voxelVolumes.Count];
+            _voxelVolumes.CopyTo(volumes);
+
+            foreach (var volume in volumes) {
+                if (volume == null || volume.GeoVolumeEngine == null)
+                    continue;
+
+                volume.GeoVolumeEngine.FlushDeferredEvents();
+            }
+        }
+
+        private void BakePreparedCollisionMeshes() {
+            MeshesBakedInLastApply = 0;
+
+            if (_preparedNodes.Count == 0)
+                return;
+
+            var collisionPresenter = CollisionPresenter;
+
+            if (collisionPresenter == null || !collisionPresenter.BakesMeshesBeforeApply)
+                return;
+
+            var meshes = new NativeList<EntityId>(_preparedNodes.Count, Allocator.TempJob);
+
+            foreach (var node in _preparedNodes) {
+                var collisionMesh = node.CollisionMesh;
+
+                if (collisionMesh != null)
+                    meshes.Add(collisionMesh.GetEntityId());
             }
 
-            _pendingMarchJobData.Clear();
-            _pendingTransitionMarchJobData.Clear();
-            _nodeToChunkCoord.Clear();
-            _combinedJobHandle = default;
+            new ColliderBakeJob { Meshes = meshes.AsArray() }.Schedule(meshes.Length, 1).Complete();
+            MeshesBakedInLastApply = meshes.Length;
+            meshes.Dispose();
         }
 
         // Returns each field to its pool instead of calling MarchJobData.Dispose()/

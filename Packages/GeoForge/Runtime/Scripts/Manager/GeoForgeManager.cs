@@ -3,10 +3,11 @@
 using System;
 using System.Collections.Generic;
 using Spellbound.Core.Logging;
-using Spellbound.Core.Tooling;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Spellbound.GeoForge {
     /// <summary>
@@ -21,8 +22,13 @@ namespace Spellbound.GeoForge {
         private readonly HashSet<IGeoVolume> _voxelVolumes = new();
 
         private HashSet<byte> _allMaterials;
+        private IChunkCollisionPresenter _collisionPresenter;
+        private Scene _collisionScene;
         private bool _isActive;
+        private bool _collisionPresenterResolved;
         private IChunkPresenter _presenter;
+        private bool _presenterResolved;
+        private bool _warnedOfMissingCollisionPresenter;
         private bool _warnedOfMissingPresenter;
 
         public GameObject LeafPrefab {
@@ -32,19 +38,39 @@ namespace Spellbound.GeoForge {
 
         public IChunkPresenter Presenter {
             get {
-                if (_presenter == null)
+                if (!_presenterResolved)
                     ResolvePresenter();
 
                 return _presenter;
             }
-            set => _presenter = value;
+            set {
+                _presenter = value;
+                _presenterResolved = true;
+            }
+        }
+
+        public IChunkCollisionPresenter CollisionPresenter {
+            get {
+                if (!_collisionPresenterResolved)
+                    ResolveCollisionPresenter();
+
+                return _collisionPresenter;
+            }
+            set {
+                _collisionPresenter = value;
+                _collisionPresenterResolved = true;
+            }
+        }
+
+        public Scene CollisionScene {
+            get => _collisionScene.IsValid() ? _collisionScene : gameObject.scene;
+            set => _collisionScene = value;
         }
 
         internal BlobAssetReference<McTablesBlobAsset> McTablesBlob { get; private set; }
 
         private void Awake() {
-            SingletonManager.RegisterSingleton(this);
-            McTablesBlob = McTablesBlobCreator.CreateMcTablesBlobAsset();
+            McTablesBlob = MarchTables.Build(Allocator.Persistent);
             ValidateAllVolumesLodsAsync();
             _isActive = true;
         }
@@ -56,18 +82,39 @@ namespace Spellbound.GeoForge {
         private void ResolvePresenter() {
             if (TryGetComponent<IChunkPresenter>(out var presenter)) {
                 _presenter = presenter;
+                _presenterResolved = true;
 
                 return;
             }
 
             _presenter = ChunkPresenterDefaults.Create(this);
+            _presenterResolved = _presenter != null;
 
-            if (_presenter != null || _warnedOfMissingPresenter)
+            if (_presenterResolved || _warnedOfMissingPresenter)
                 return;
 
             _warnedOfMissingPresenter = true;
             Log.Emit(LogLevel.Warning,
                 $"{name}: no chunk presenter is installed, so terrain is meshed but nothing is drawn.", this);
+        }
+
+        private void ResolveCollisionPresenter() {
+            if (TryGetComponent<IChunkCollisionPresenter>(out var collisionPresenter)) {
+                _collisionPresenter = collisionPresenter;
+                _collisionPresenterResolved = true;
+
+                return;
+            }
+
+            _collisionPresenter = ChunkPresenterDefaults.CreateCollision(this);
+            _collisionPresenterResolved = _collisionPresenter != null;
+
+            if (_collisionPresenterResolved || _warnedOfMissingCollisionPresenter)
+                return;
+
+            _warnedOfMissingCollisionPresenter = true;
+            Log.Emit(LogLevel.Warning,
+                $"{name}: no chunk collision presenter is installed, so terrain is meshed but nothing collides.", this);
         }
 
         private void OnDestroy() {
@@ -102,7 +149,7 @@ namespace Spellbound.GeoForge {
                 }
             }
             finally {
-                Debug.Log("ValidateAllVolumesLodsAsync stopped");
+                Log.Debug($"{nameof(GeoForgeManager)}.{nameof(ValidateAllVolumesLodsAsync)} stopped.");
             }
         }
 
@@ -151,9 +198,6 @@ namespace Spellbound.GeoForge {
         ///     For Terraforming Commands that might affect multiple volumes. materialIndex and
         ///     allowedMaterialsMask are shared across every volume the action touches; only the
         ///     per-volume edits/bounds come from the terraformAction delegate.
-        ///     Internal: matches TerraformCommands's own established convention ("should be accessed
-        ///     through the public GeoForgeStatic class") - GeoForgeStatic is the one sanctioned public
-        ///     entry point for terraform operations, this is the plumbing underneath it.
         /// </summary>
         [Obsolete]
         internal void ExecuteTerraformAll(
@@ -176,8 +220,6 @@ namespace Spellbound.GeoForge {
         ///     affected chunk. materialIndex and allowedMaterialsMask are properties of the whole
         ///     terraform action and are copied onto every chunk's operation unchanged; only the
         ///     per-chunk Deltas differ.
-        ///     Internal: same reasoning as ExecuteTerraformAll above - reachable only through
-        ///     GeoForgeStatic.
         /// </summary>
         [Obsolete]
         internal void DistributeVoxelEdits(
@@ -284,6 +326,13 @@ namespace Spellbound.GeoForge {
             }
 
             return false;
+        }
+
+        public bool IsInsideTerrain(Vector3 worldPosition) {
+            if (!TryQueryVoxel(worldPosition, out var voxelData, out _))
+                return false;
+
+            return VoxelEncoding.IsSolid(voxelData.Density);
         }
 
         /// <summary>

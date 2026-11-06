@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using Unity.Collections;
 using Unity.Entities;
@@ -36,7 +36,7 @@ namespace Spellbound.GeoForge {
             config.CubesMarchedPerOctreeLeaf = voxelVolumeConfig.cubesPerMarch;
             config.LevelsOfDetail = voxelVolumeConfig.levelsOfDetail - 1;
             config.ChunkSize = voxelVolumeConfig.ChunkSize;
-            config.ChunkDataWidthSize = config.ChunkSize + 3;
+            config.ChunkDataWidthSize = ChunkLayout.DataWidth(config.ChunkSize);
             config.ChunkDataAreaSize = config.ChunkDataWidthSize * config.ChunkDataWidthSize;
             config.ChunkDataVolumeSize = config.ChunkDataAreaSize * config.ChunkDataWidthSize;
             config.Resolution = voxelVolumeConfig.resolution;

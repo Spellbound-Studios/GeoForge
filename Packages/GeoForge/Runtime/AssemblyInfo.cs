@@ -4,3 +4,4 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Spellbound.GeoForge.Editor.Tests")]
 [assembly: InternalsVisibleTo("Spellbound.GeoForge.Tests")]
+[assembly: InternalsVisibleTo("Spellbound.GeoForge.Presentation")]

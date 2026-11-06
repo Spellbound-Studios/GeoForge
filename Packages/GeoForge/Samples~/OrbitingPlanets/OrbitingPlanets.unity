@@ -655,6 +655,14 @@ PrefabInstance:
       propertyPath: <ViewDistanceLodRanges>k__BackingField.Array.data[3].y
       value: 240
       objectReference: {fileID: 0}
+    - target: {fileID: 9083058433317415293, guid: 80a472fdc0d173e4085c2c257658e455, type: 3}
+      propertyPath: manager
+      value: 
+      objectReference: {fileID: 1518474231}
+    - target: {fileID: 4718302265981530017, guid: 80a472fdc0d173e4085c2c257658e455, type: 3}
+      propertyPath: viewpoint
+      value: 
+      objectReference: {fileID: 1350744717}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1067,6 +1075,14 @@ PrefabInstance:
       propertyPath: <ViewDistanceLodRanges>k__BackingField.Array.data[3].y
       value: 240
       objectReference: {fileID: 0}
+    - target: {fileID: 9083058433317415293, guid: 80a472fdc0d173e4085c2c257658e455, type: 3}
+      propertyPath: manager
+      value: 
+      objectReference: {fileID: 1518474231}
+    - target: {fileID: 4718302265981530017, guid: 80a472fdc0d173e4085c2c257658e455, type: 3}
+      propertyPath: viewpoint
+      value: 
+      objectReference: {fileID: 1350744717}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1595,6 +1611,14 @@ PrefabInstance:
       propertyPath: <ViewDistanceLodRanges>k__BackingField.Array.data[3].y
       value: 240
       objectReference: {fileID: 0}
+    - target: {fileID: 9083058433317415293, guid: 80a472fdc0d173e4085c2c257658e455, type: 3}
+      propertyPath: manager
+      value: 
+      objectReference: {fileID: 1518474231}
+    - target: {fileID: 4718302265981530017, guid: 80a472fdc0d173e4085c2c257658e455, type: 3}
+      propertyPath: viewpoint
+      value: 
+      objectReference: {fileID: 1350744717}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1637,3 +1661,14 @@ SceneRoots:
   - {fileID: 434606818}
   - {fileID: 863422471}
   - {fileID: 651741606}
+--- !u!114 &1518474231 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6673862094514295435, guid: 649071cd54a327946a92f1cedecd78e2, type: 3}
+  m_PrefabInstance: {fileID: 732878297}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e236c09a8a93ae419d10d8c20914a0f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

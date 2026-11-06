@@ -2,7 +2,6 @@
 
 using System.Collections.Generic;
 using NUnit.Framework;
-using Spellbound.Core.Tooling;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -16,16 +15,13 @@ namespace Spellbound.GeoForge.Tests {
 
         private GeoChunkDouble _chunk;
         private BlobAssetReference<VolumeConfigBlobAsset> _configBlob;
-        private bool _hadManager;
-        private GeoForgeManager _previousManager;
         private BlobAssetReference<McTablesBlobAsset> _tables;
+        private GeoVolumeDouble _volume;
         private NativeArray<VoxelData> _voxels;
 
         [SetUp]
         public void SetUp() {
-            _hadManager = SingletonManager.TryGetSingletonInstance(out _previousManager);
-            var managerObject = Track(new GameObject("GeoForge Manager"));
-            SingletonManager.RegisterSingleton(managerObject.AddComponent<GeoForgeManager>());
+            var manager = Track(new GameObject("GeoForge Manager")).AddComponent<GeoForgeManager>();
 
             var config = Track(ScriptableObject.CreateInstance<VoxelVolumeConfig>());
             config.cubesPerMarch = ChunkSize;
@@ -34,10 +30,12 @@ namespace Spellbound.GeoForge.Tests {
             config.chunkSize = ChunkSize;
             config.sizeInChunks = Vector3Int.one;
             _configBlob = VolumeConfigBlobCreator.CreateVolumeConfigBlobAsset(config);
-            _tables = McTablesBlobCreator.CreateMcTablesBlobAsset();
+            _tables = MarchTables.Build(Allocator.Persistent);
 
             var volumeObject = Track(new GameObject("Volume"));
-            volumeObject.AddComponent<GeoVolumeDouble>().ConfigBlob = _configBlob;
+            _volume = volumeObject.AddComponent<GeoVolumeDouble>();
+            _volume.ConfigBlob = _configBlob;
+            _volume.GeoVolumeEngine = new GeoVolumeEngine(_volume, _volume, config, manager);
             var chunkTransform = new GameObject("Chunk").transform;
             chunkTransform.SetParent(volumeObject.transform, false);
             _chunk = new GeoChunkDouble(chunkTransform);
@@ -66,6 +64,8 @@ namespace Spellbound.GeoForge.Tests {
             if (_tables.IsCreated)
                 _tables.Dispose();
 
+            _volume.GeoVolumeEngine.Dispose();
+
             if (_configBlob.IsCreated)
                 _configBlob.Dispose();
 
@@ -75,11 +75,6 @@ namespace Spellbound.GeoForge.Tests {
             }
 
             _created.Clear();
-
-            if (_hadManager)
-                SingletonManager.RegisterSingleton(_previousManager);
-            else
-                SingletonManager.UnregisterSingleton<GeoForgeManager>();
         }
 
         [TestCase(1, 1, 1)]

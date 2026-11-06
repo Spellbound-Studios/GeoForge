@@ -3,8 +3,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Spellbound.Core.Logging;
 using Spellbound.Core.Packing;
-using Spellbound.Core.Tooling;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
@@ -14,24 +15,58 @@ namespace Spellbound.GeoForge {
     public class GeoVolumeEngine : IDisposable {
         private const int SaveFormatVersion = 1;
         private readonly Bounds _bounds;
+        private readonly List<DeferredVolumeEvent> _deferredEvents = new();
         private readonly HashSet<IGeoChunk> _meshedChunks = new();
 
         private readonly MonoBehaviour _owner;
         private readonly IGeoVolume _ownerAsIGeoVolume;
 
-        public GeoVolumeEngine(MonoBehaviour owner, IGeoVolume ownerAsIGeoVolume, VoxelVolumeConfig config) {
+        private IChunkInterest _chunkInterest = new DistanceChunkInterest();
+        private IDensitySource _densitySource;
+        private IDensitySource _generatorDensitySource;
+        private GeoForgeDataGenerator _wrappedGenerator;
+        private int _eventHolds;
+        private bool _flushingEvents;
+        private bool _validationHoldsEvents;
+        private bool _isDisposed;
+        private bool _reportedMissingViewers;
+        private int _viewerCount;
+        private ChunkViewer[] _viewers = Array.Empty<ChunkViewer>();
+        private NativeArray<ChunkViewer> _viewersVoxelSpace;
+        private NativeArray<Vector2> _levelOfDetailRanges;
+
+        public GeoVolumeEngine(
+            MonoBehaviour owner, IGeoVolume ownerAsIGeoVolume, VoxelVolumeConfig config, GeoForgeManager manager) {
             _owner = owner;
             _ownerAsIGeoVolume = ownerAsIGeoVolume;
+            Manager = manager;
             ConfigBlob = VolumeConfigBlobCreator.CreateVolumeConfigBlobAsset(config);
             _bounds = CalculateVolumeBounds();
         }
 
         public BlobAssetReference<VolumeConfigBlobAsset> ConfigBlob { get; }
 
+        public GeoForgeManager Manager { get; }
+
         public Transform Transform => _owner.transform;
         public Dictionary<Vector3Int, IGeoChunk> ChunkDict { get; } = new();
 
+        public IChunkInterest ChunkInterest {
+            get => _chunkInterest;
+            set => _chunkInterest = value ?? throw new ArgumentNullException(nameof(value));
+        }
+
+        public IDensitySource DensitySource => _densitySource;
+
+        public VolumeVersion Version { get; private set; }
+
+        public event Action<VolumeChange> Changed;
+
+        public event Action<ChunkResidency> ResidencyChanged;
+
         public void Dispose() {
+            _isDisposed = true;
+
             var chunkList = new List<IGeoChunk>(ChunkDict.Values);
             foreach (var chunk in chunkList) {
                 chunk.GeoChunkEngine.Dispose();
@@ -44,11 +79,170 @@ namespace Spellbound.GeoForge {
                 Object.Destroy(chunk.GeoChunkEngine.Transform.gameObject);
             }
 
-            if (SingletonManager.TryGetSingletonInstance<GeoForgeManager>(out var mcManager))
-                mcManager.UnRegisterVoxelVolume(_ownerAsIGeoVolume);
+            if (Manager != null)
+                Manager.UnRegisterVoxelVolume(_ownerAsIGeoVolume);
+
+            if (_viewersVoxelSpace.IsCreated)
+                _viewersVoxelSpace.Dispose();
+
+            if (_levelOfDetailRanges.IsCreated)
+                _levelOfDetailRanges.Dispose();
 
             if (ConfigBlob.IsCreated)
                 ConfigBlob.Dispose();
+        }
+
+        public void UseDensitySource(IDensitySource source) {
+            _densitySource = source;
+        }
+
+        internal IDensitySource DensitySourceFor(GeoForgeDataGenerator generator) {
+            if (_densitySource != null)
+                return _densitySource;
+
+            if (_generatorDensitySource == null || _wrappedGenerator != generator) {
+                _generatorDensitySource = GeoForgeKit.CreateDensitySource(generator, ConfigBlob);
+                _wrappedGenerator = generator;
+            }
+
+            return _generatorDensitySource;
+        }
+
+        internal ChunkFillRequest CreateFillRequest(Vector3Int chunkCoordinate) {
+            return ChunkFillRequest.ForChunk(chunkCoordinate, ConfigBlob.Value, uint.MinValue);
+        }
+
+        internal void RaiseChanged(Vector3Int chunkCoordinate, BoundsInt voxelBounds) {
+            Version = Version.Next();
+            var change = new VolumeChange(chunkCoordinate, voxelBounds, Version);
+
+            if (HoldsEvents) {
+                _deferredEvents.Add(DeferredVolumeEvent.ForChange(change));
+                return;
+            }
+
+            Raise(Changed, change);
+        }
+
+        internal void RaiseResidencyChanged(in ChunkResidency residency) {
+            if (HoldsEvents) {
+                _deferredEvents.Add(DeferredVolumeEvent.ForResidency(residency));
+                return;
+            }
+
+            Raise(ResidencyChanged, residency);
+        }
+
+        private bool HoldsEvents =>
+            _flushingEvents || _eventHolds > 0 || (Manager != null && Manager.IsApplyingMarchResults);
+
+        internal void HoldEvents() {
+            _eventHolds++;
+        }
+
+        internal void ReleaseHeldEvents() {
+            if (_eventHolds > 0)
+                _eventHolds--;
+
+            FlushDeferredEvents();
+        }
+
+        internal void FlushDeferredEvents() {
+            if (_deferredEvents.Count == 0 || HoldsEvents)
+                return;
+
+            _flushingEvents = true;
+
+            try {
+                for (var index = 0; index < _deferredEvents.Count; index++) {
+                    var deferredEvent = _deferredEvents[index];
+
+                    if (deferredEvent.IsResidency)
+                        Raise(ResidencyChanged, deferredEvent.Residency);
+                    else
+                        Raise(Changed, deferredEvent.Change);
+                }
+            }
+            finally {
+                _deferredEvents.Clear();
+                _flushingEvents = false;
+            }
+        }
+
+        private void Raise<T>(Action<T> handlers, T argument) {
+            if (handlers == null)
+                return;
+
+            foreach (var handler in handlers.GetInvocationList()) {
+                try {
+                    ((Action<T>)handler)(argument);
+                }
+                catch (Exception exception) {
+                    Log.Error($"{_owner.name}: a subscriber to {typeof(T).Name} threw: {exception}", _owner);
+                }
+            }
+        }
+
+        internal NativeArray<Vector2>.ReadOnly ReadLevelOfDetailRanges() {
+            var ranges = _ownerAsIGeoVolume.ViewDistanceLodRanges ?? Array.Empty<Vector2>();
+
+            if (!_levelOfDetailRanges.IsCreated || _levelOfDetailRanges.Length != ranges.Length) {
+                if (_levelOfDetailRanges.IsCreated)
+                    _levelOfDetailRanges.Dispose();
+
+                _levelOfDetailRanges = new NativeArray<Vector2>(ranges.Length, Allocator.Persistent);
+            }
+
+            _levelOfDetailRanges.CopyFrom(ranges);
+
+            return _levelOfDetailRanges.AsReadOnly();
+        }
+
+        public void SetViewers(ReadOnlySpan<ChunkViewer> viewers) {
+            if (_viewers.Length < viewers.Length)
+                _viewers = new ChunkViewer[viewers.Length];
+
+            viewers.CopyTo(_viewers);
+            _viewerCount = viewers.Length;
+        }
+
+        private bool TryConvertViewers(out NativeArray<ChunkViewer> viewersVoxelSpace) {
+            viewersVoxelSpace = default;
+
+            if (_viewerCount == 0) {
+                ReportMissingViewers();
+
+                return false;
+            }
+
+            if (_viewersVoxelSpace.Length < _viewerCount) {
+                if (_viewersVoxelSpace.IsCreated)
+                    _viewersVoxelSpace.Dispose();
+
+                _viewersVoxelSpace = new NativeArray<ChunkViewer>(_viewerCount, Allocator.Persistent);
+            }
+
+            var resolution = ConfigBlob.Value.Resolution;
+
+            for (var index = 0; index < _viewerCount; index++) {
+                var viewer = _viewers[index];
+                _viewersVoxelSpace[index] = new ChunkViewer(WorldToVoxelSpace(viewer.Position),
+                    viewer.CollisionRadius / resolution, viewer.DetailRadius / resolution);
+            }
+
+            viewersVoxelSpace = _viewersVoxelSpace.GetSubArray(0, _viewerCount);
+
+            return true;
+        }
+
+        private void ReportMissingViewers() {
+            if (_reportedMissingViewers)
+                return;
+
+            _reportedMissingViewers = true;
+            Log.Emit(LogLevel.Warning,
+                $"{_owner.name}: the volume has no viewers, so no chunk's level of detail is validated; give it a " +
+                $"{nameof(TransformChunkViewer)} or call {nameof(IGeoVolume)}.{nameof(SetViewers)}.", _owner);
         }
 
         public void HandleChunkMeshReady(IGeoChunk chunk) {
@@ -154,9 +348,7 @@ namespace Spellbound.GeoForge {
                 var cornerVoxelPos = cellOrigin + new Vector3Int(dx, dy, dz);
                 var cornerVoxel = chunk.GetVoxelDataFromVoxelPosition(cornerVoxelPos);
 
-                // ASSUMPTION - see note below: solid == Density >= 0, per the "zero-threshold
-                // convention" TryQueryVoxel's own doc comment refers to.
-                if (cornerVoxel.Density < 0)
+                if (!VoxelEncoding.IsSolid(cornerVoxel.Density))
                     continue;
 
                 // Plain index, not the raw maturity-inclusive MaterialIndex byte
@@ -185,7 +377,7 @@ namespace Spellbound.GeoForge {
                 return false;
 
             materialIndex = allSolidMaterialsMatch ? firstSolidMaterial : nearestSolidMaterial;
-            materialIndex %= VoxelData.MatureBitValue;
+            materialIndex = VoxelEncoding.MaterialIndex(materialIndex);
 
             return true;
         }
@@ -205,8 +397,7 @@ namespace Spellbound.GeoForge {
             if (chunk == null || !chunk.HasVoxelData())
                 return false;
 
-            if (!SingletonManager.TryGetSingletonInstance<GeoForgeManager>(out var manager) ||
-                !manager.McTablesBlob.IsCreated)
+            if (Manager == null || !Manager.McTablesBlob.IsCreated)
                 return false;
 
             var cellOrigin = new Vector3Int(
@@ -214,19 +405,147 @@ namespace Spellbound.GeoForge {
                 Mathf.FloorToInt(continuousVoxelPosition.y),
                 Mathf.FloorToInt(continuousVoxelPosition.z));
 
-            surfaceCase = chunk.GeoChunkEngine.ComputeSurfaceCase(cellOrigin, ref manager.McTablesBlob.Value);
+            surfaceCase = chunk.GeoChunkEngine.ComputeSurfaceCase(cellOrigin, ref Manager.McTablesBlob.Value);
+
+            return true;
+        }
+
+        public bool TryQuerySolid(Vector3 worldPosition, out bool solid) {
+            solid = false;
+
+            if (!TryQueryVoxel(worldPosition, out var voxel))
+                return false;
+
+            solid = VoxelEncoding.IsSolid(voxel.Density);
+
+            return true;
+        }
+
+        public bool IsMeshReady(Vector3 worldPosition, ReadinessScope scope) {
+            var voxelPosition = WorldToVoxelSpace(worldPosition);
+
+            return IsRegionReady(voxelPosition, voxelPosition, scope, false);
+        }
+
+        public bool IsColliderReady(Vector3 worldPosition, ReadinessScope scope) {
+            var voxelPosition = WorldToVoxelSpace(worldPosition);
+
+            return IsRegionReady(voxelPosition, voxelPosition, scope, true);
+        }
+
+        public bool IsBoxReady(in Bounds worldBounds, ReadinessScope scope, out VolumeVersion version) {
+            version = Version;
+            var minimum = Vector3Int.one * int.MaxValue;
+            var maximum = Vector3Int.one * int.MinValue;
+            var worldMinimum = worldBounds.min;
+            var worldMaximum = worldBounds.max;
+
+            for (var corner = 0; corner < 8; corner++) {
+                var cornerPosition = new Vector3(
+                    (corner & 1) == 0 ? worldMinimum.x : worldMaximum.x,
+                    (corner & 2) == 0 ? worldMinimum.y : worldMaximum.y,
+                    (corner & 4) == 0 ? worldMinimum.z : worldMaximum.z);
+                var voxelPosition = WorldToVoxelSpace(cornerPosition);
+                minimum = Vector3Int.Min(minimum, voxelPosition);
+                maximum = Vector3Int.Max(maximum, voxelPosition);
+            }
+
+            return IsRegionReady(minimum, maximum, scope, true);
+        }
+
+        private bool IsRegionReady(
+            Vector3Int voxelMinimum, Vector3Int voxelMaximum, ReadinessScope scope, bool requiresCollider) {
+            var chunkSize = ConfigBlob.Value.ChunkSize;
+            var firstChunk = GetCoordByVoxelPosition(voxelMinimum);
+            var lastChunk = GetCoordByVoxelPosition(voxelMaximum);
+
+            for (var x = firstChunk.x; x <= lastChunk.x; x++)
+            for (var y = firstChunk.y; y <= lastChunk.y; y++)
+            for (var z = firstChunk.z; z <= lastChunk.z; z++) {
+                var coordinate = new Vector3Int(x, y, z);
+                var chunk = GetChunkByCoord(coordinate);
+
+                if (chunk == null || !chunk.HasVoxelData())
+                    return false;
+
+                if (chunk.DensityRange.IsSkippable())
+                    continue;
+
+                var rootNode = chunk.GeoChunkEngine.RootNode;
+
+                if (rootNode == null)
+                    return false;
+
+                var chunkOrigin = coordinate * chunkSize;
+
+                if (!rootNode.IsRegionReady(voxelMinimum - chunkOrigin, voxelMaximum - chunkOrigin, scope,
+                        requiresCollider))
+                    return false;
+            }
+
+            return true;
+        }
+
+        public bool TryCopyRunList(
+            Vector3Int chunkCoordinate, NativeList<SparseVoxelData> destination, out VolumeVersion version) {
+            version = Version;
+
+            if (!destination.IsCreated)
+                throw new ArgumentException("A run list copy needs a created destination list.", nameof(destination));
+
+            if (!TryGetRunList(chunkCoordinate, out var runs))
+                return false;
+
+            destination.CopyFrom(runs);
+
+            return true;
+        }
+
+        public bool TryCopySolidRuns(
+            Vector3Int chunkCoordinate, NativeList<SolidRun> destination, out VolumeVersion version) {
+            version = Version;
+
+            if (!destination.IsCreated)
+                throw new ArgumentException("A solid run copy needs a created destination list.", nameof(destination));
+
+            if (!TryGetRunList(chunkCoordinate, out var runs))
+                return false;
+
+            destination.Clear();
+
+            for (var index = 0; index < runs.Length; index++) {
+                var run = runs[index];
+                var solid = VoxelEncoding.IsSolid(run.Voxel.Density);
+
+                if (destination.Length > 0 && destination[destination.Length - 1].Solid == solid)
+                    continue;
+
+                destination.Add(new SolidRun(run.StartIndex, solid));
+            }
+
+            return true;
+        }
+
+        private bool TryGetRunList(Vector3Int chunkCoordinate, out NativeList<SparseVoxelData> runs) {
+            runs = default;
+            var chunk = GetChunkByCoord(chunkCoordinate);
+
+            if (chunk == null || !chunk.HasVoxelData())
+                return false;
+
+            runs = chunk.GeoChunkEngine.GetsSparseVoxelData();
 
             return true;
         }
 
         public void RegisterVolume() {
-            if (!SingletonManager.TryGetSingletonInstance<GeoForgeManager>(out var mcManager)) {
-                Debug.LogError("GeoForgeManager is null." + this);
+            if (Manager == null) {
+                Log.Error($"{_owner.name}: the volume engine holds no {nameof(GeoForgeManager)}.", _owner);
 
                 return;
             }
 
-            mcManager.RegisterVoxelVolume(_ownerAsIGeoVolume);
+            Manager.RegisterVoxelVolume(_ownerAsIGeoVolume);
         }
 
         public IGeoChunk GetChunkByCoord(Vector3Int coord) {
@@ -246,13 +565,7 @@ namespace Spellbound.GeoForge {
         }
 
         public Vector3Int GetCoordByVoxelPosition(Vector3Int voxelPos) {
-            ref var config = ref ConfigBlob.Value;
-
-            return new Vector3Int(
-                Mathf.FloorToInt((voxelPos.x - 1f) / config.ChunkSize),
-                Mathf.FloorToInt((voxelPos.y - 1f) / config.ChunkSize),
-                Mathf.FloorToInt((voxelPos.z - 1f) / config.ChunkSize)
-            );
+            return ChunkLayout.CoordinateOfVoxel(voxelPos, ConfigBlob.Value.ChunkSize);
         }
 
         // Resets every chunk whose edit-store currently has recorded edits back to deterministic
@@ -274,7 +587,7 @@ namespace Spellbound.GeoForge {
         // data but never actually meshed until the background ValidateAllVolumesLodsAsync loop
         // happens to reach that chunk on its own.
         public void ResetEditedChunksToProcedural(GeoForgeDataGenerator dataGenerator) {
-            if (!SingletonManager.TryGetSingletonInstance<GeoForgeManager>(out var gfManager))
+            if (Manager == null)
                 return;
 
             _meshedChunks.Clear();
@@ -290,33 +603,63 @@ namespace Spellbound.GeoForge {
                 if (!hasEdits)
                     continue;
 
-                chunk.SetVoxels(kvp.Key, ConfigBlob, dataGenerator);
+                chunk.SetVoxels(CreateFillRequest(kvp.Key), DensitySourceFor(dataGenerator));
                 resetChunks.Add(chunk);
             }
 
             if (resetChunks.Count == 0)
                 return;
 
-            var lodTarget = _ownerAsIGeoVolume.LodTarget;
-
-            if (lodTarget == null)
-                return;
-
-            var lodDistanceTargetVoxelSpace = WorldToVoxelSpace(lodTarget.position);
             var validatesPerFrame = ConfigBlob.Value.ValidatesPerFrame;
 
             for (var i = 0; i < resetChunks.Count; i += validatesPerFrame) {
+                if (!TryConvertViewers(out var viewersVoxelSpace))
+                    return;
+
                 var batchSize = Mathf.Min(validatesPerFrame, resetChunks.Count - i);
                 var batch = resetChunks.GetRange(i, batchSize);
 
                 foreach (var chunk in batch)
-                    chunk.ScheduleOctreeLodValidation(lodDistanceTargetVoxelSpace);
+                    ScheduleValidation(chunk, viewersVoxelSpace);
 
-                gfManager.CompleteAndApplyMarchingCubesJobs();
+                CompleteValidationBatch(batch);
+            }
+        }
+
+        private void ScheduleValidation(IGeoChunk chunk, NativeArray<ChunkViewer> viewersVoxelSpace) {
+            if (!_validationHoldsEvents) {
+                _validationHoldsEvents = true;
+                HoldEvents();
+            }
+
+            try {
+                chunk.ScheduleOctreeLodValidation(viewersVoxelSpace, _chunkInterest);
+            }
+            catch {
+                EndValidationHold();
+
+                throw;
+            }
+        }
+
+        private void CompleteValidationBatch(List<IGeoChunk> batch) {
+            try {
+                Manager.CompleteAndApplyMarchingCubesJobs();
 
                 foreach (var chunk in batch)
                     chunk.ReleaseLodValidation();
             }
+            finally {
+                EndValidationHold();
+            }
+        }
+
+        private void EndValidationHold() {
+            if (!_validationHoldsEvents)
+                return;
+
+            _validationHoldsEvents = false;
+            ReleaseHeldEvents();
         }
 
         // Batches chunks into groups of ConfigBlob.Value.ValidatesPerFrame: schedule each chunk's
@@ -332,16 +675,12 @@ namespace Spellbound.GeoForge {
         public async Awaitable ValidateChunkLodsAsync() {
             var chunkList = ChunkDict.Keys.ToList();
 
-            if (!SingletonManager.TryGetSingletonInstance<GeoForgeManager>(out var mcManager))
-                return;
-
-            var lodTarget = _ownerAsIGeoVolume.LodTarget;
-
-            if (lodTarget == null)
+            if (Manager == null)
                 return;
 
             var validatesPerFrame = ConfigBlob.Value.ValidatesPerFrame;
             var scheduledChunks = new List<IGeoChunk>(validatesPerFrame);
+            var viewersVoxelSpace = default(NativeArray<ChunkViewer>);
 
             foreach (var coord in chunkList) {
                 if (!ChunkDict.TryGetValue(coord, out var chunk))
@@ -352,18 +691,16 @@ namespace Spellbound.GeoForge {
 
                 if (chunk.DensityRange.IsSkippable()) continue;
 
-                var lodDistanceTargetVoxelSpace = WorldToVoxelSpace(lodTarget.position);
-                chunk.ScheduleOctreeLodValidation(lodDistanceTargetVoxelSpace);
+                if (scheduledChunks.Count == 0 && !TryConvertViewers(out viewersVoxelSpace))
+                    return;
+
+                ScheduleValidation(chunk, viewersVoxelSpace);
                 scheduledChunks.Add(chunk);
 
                 if (scheduledChunks.Count < validatesPerFrame)
                     continue;
 
-                mcManager.CompleteAndApplyMarchingCubesJobs();
-
-                foreach (var scheduledChunk in scheduledChunks)
-                    scheduledChunk.ReleaseLodValidation();
-
+                CompleteValidationBatch(scheduledChunks);
                 scheduledChunks.Clear();
 
                 await Awaitable.NextFrameAsync();
@@ -371,24 +708,13 @@ namespace Spellbound.GeoForge {
                 // Re-check liveness after the yield, once per batch rather than once per chunk
                 // (the old loop re-checked the manager singleton on every single chunk). Bails out
                 // and abandons any remaining chunks in this call if the manager is gone.
-                if (!SingletonManager.TryGetSingletonInstance(out mcManager))
-                    return;
-
-                // lodTarget can be destroyed during the yield above (e.g. its owning player/entity
-                // despawns mid-validation) - re-check it the same way mcManager is re-checked, or
-                // the next iteration's lodTarget.position throws MissingReferenceException on a
-                // Transform whose native object no longer exists.
-                if (lodTarget == null)
+                if (Manager == null || _isDisposed)
                     return;
             }
 
             // Flush a partial final batch that never reached validatesPerFrame.
-            if (scheduledChunks.Count > 0) {
-                mcManager.CompleteAndApplyMarchingCubesJobs();
-
-                foreach (var scheduledChunk in scheduledChunks)
-                    scheduledChunk.ReleaseLodValidation();
-            }
+            if (scheduledChunks.Count > 0)
+                CompleteValidationBatch(scheduledChunks);
         }
 
         // Gathers every chunk's edits (via IGeoEditStore.ReadAllEdits, the interface's generic
@@ -474,13 +800,14 @@ namespace Spellbound.GeoForge {
 
             var entries = Packer.UnpackList<ChunkSaveEntry>(ref span);
 
-            if (!SingletonManager.TryGetSingletonInstance<GeoForgeManager>(out var gfManager)) {
-                Debug.LogError("GeoVolume.TryLoadFromByteArray: GeoForgeManager not found.");
+            if (Manager == null) {
+                Log.Error($"{_owner.name}: the volume engine holds no {nameof(GeoForgeManager)}, so nothing loads.",
+                    _owner);
 
                 return false;
             }
 
-            var editPoolCapacity = gfManager.GetEditPoolCapacity(config.ChunkSize);
+            var editPoolCapacity = Manager.GetEditPoolCapacity(config.ChunkSize);
 
             if (editPoolCapacity <= 0) {
                 Debug.LogError(
@@ -493,7 +820,7 @@ namespace Spellbound.GeoForge {
             for (var i = 0; i < entries.Count; i += editPoolCapacity) {
                 var batchSize = Mathf.Min(editPoolCapacity, entries.Count - i);
 
-                gfManager.BeginEditBatch();
+                Manager.BeginEditBatch();
 
                 try {
                     for (var j = i; j < i + batchSize; j++) {
@@ -513,7 +840,7 @@ namespace Spellbound.GeoForge {
                     }
                 }
                 finally {
-                    gfManager.EndEditBatch();
+                    Manager.EndEditBatch();
                 }
             }
 

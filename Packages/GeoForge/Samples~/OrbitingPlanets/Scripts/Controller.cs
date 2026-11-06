@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System.Collections.Generic;
 using UnityEngine;
@@ -109,7 +109,7 @@ namespace Spellbound.GeoForge.Sample3 {
                         GeoForgeCommands.RemoveSphere(
                             iVolume,
                             hit.point,   // worldPosition - sphere centers here
-                            radius: terraformSize, // world units, same convention as GeoForgeStatic.RemoveSphere's radius
+                            radius: terraformSize, // world units
                             delta: terraformStrength,    // magnitude to subtract - RemoveSphere negates this internally
                             allowedMaterialsMask: digMaskDefinition.GetMask()
                         );
@@ -148,33 +148,43 @@ namespace Spellbound.GeoForge.Sample3 {
             }
 #else
             if (Input.GetKeyDown(KeyCode.Alpha1)
-                        && Physics.Raycast(
-                        transform.position,
-                        transform.forward,
-                        out var hit,
-                        terraformRange,
-                        ~0)){
-               GeoForgeStatic.RemoveSphereAll(hit, terraformSize, terraformStrength, diggableMaterialList);
-                    lineRenderer.enabled = true;
-                    lineRenderer.SetPosition(0, transform.position - transform.up * lineRendererStartOffset);
-                    lineRenderer.SetPosition(1, hit.point);
+                && Physics.Raycast(transform.position, transform.forward, out var hit, terraformRange, ~0)) {
+                var iVolume = hit.collider.transform.GetComponentInParent<IGeoVolume>();
+
+                if (iVolume != null) {
+                    GeoForgeCommands.RemoveSphere(
+                        iVolume,
+                        hit.point,
+                        radius: terraformSize,
+                        delta: terraformStrength,
+                        allowedMaterialsMask: digMaskDefinition.GetMask()
+                    );
+                }
+                lineRenderer.enabled = true;
+                lineRenderer.SetPosition(0, transform.position - transform.up * lineRendererStartOffset);
+                lineRenderer.SetPosition(1, hit.point);
             }
-                    
-                else if (Input.GetKeyDown(KeyCode.Alpha2)
-                         && Physics.Raycast(
-                        transform.position,
-                        transform.forward,
-                        out hit,
-                        terraformRange,
-                        ~0)){
-                GeoForgeStatic.AddSphere(hit, terraformSize, terraformStrength, addableMaterial);
-                    lineRenderer.enabled = true;
-                    lineRenderer.SetPosition(0, transform.position - transform.up * lineRendererStartOffset);
-                    lineRenderer.SetPosition(1, hit.point);
+            else if (Input.GetKeyDown(KeyCode.Alpha2)
+                     && Physics.Raycast(transform.position, transform.forward, out hit, terraformRange, ~0)) {
+                var iVolume = hit.collider.transform.GetComponentInParent<IGeoVolume>();
+
+                if (iVolume != null) {
+                    GeoForgeCommands.AddSphere(
+                        iVolume,
+                        hit.point,
+                        radius: terraformSize,
+                        delta: terraformStrength,
+                        material: addableMaterial,
+                        allowedMaterialsMask: digMaskDefinition.GetMask()
+                    );
                 }
-                 else {
-                    lineRenderer.enabled = false;
-                }
+                lineRenderer.enabled = true;
+                lineRenderer.SetPosition(0, transform.position - transform.up * lineRendererStartOffset);
+                lineRenderer.SetPosition(1, hit.point);
+            }
+            else {
+                lineRenderer.enabled = false;
+            }
 #endif
         }
 

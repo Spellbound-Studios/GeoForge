@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6002279756793364359}
   - component: {fileID: 6673862094514295435}
-  - component: {fileID: 4518230647120934711}
+  - component: {fileID: 7302851467729154431}
   m_Layer: 0
   m_Name: GeoForgeManager
   m_TagString: Untagged
@@ -49,7 +49,7 @@ MonoBehaviour:
   materialDatabase: {fileID: 11400000, guid: f262553490c7f6d4fa3350502d00458c, type: 2}
   jobAndRenderProfile: {fileID: 11400000, guid: a427e359e709c4147b143c593ffd27bd, type: 2}
   useColliders: 1
---- !u!114 &4518230647120934711
+--- !u!114 &7302851467729154431
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -58,6 +58,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 2143009024312342097}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a59fe6609d0870f47b262b4e64409526, type: 3}
+  m_Script: {fileID: 11500000, guid: d934973c799242b42baf746c5a353d5a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  bakeOffMainThread: 1
+  colliderLayer: -1
+  physicsMaterial: {fileID: 0}

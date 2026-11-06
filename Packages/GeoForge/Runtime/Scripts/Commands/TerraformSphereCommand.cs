@@ -1,6 +1,6 @@
-﻿// Copyright 2026 Spellbound Studio Inc.
+﻿// Copyright (c) Spellbound Studios. All rights reserved.
 
-using Spellbound.Core.Tooling;
+using Spellbound.Core.Logging;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -65,9 +65,10 @@ namespace Spellbound.GeoForge {
             short delta,
             byte materialIndex,
             uint4 allowedMaterialsMask) {
-            if (!SingletonManager.TryGetSingletonInstance<GeoForgeManager>(out var gfManager)) {
-                Debug.LogError(
-                    "TerraformSphereCommand: GeoForgeManager not found. Ensure it's in the current scene.");
+            var gfManager = geoVolume.GeoVolumeEngine?.Manager;
+
+            if (gfManager == null) {
+                Log.Error($"{nameof(TerraformSphereCommand)}: the volume holds no {nameof(GeoForgeManager)}.");
 
                 return false;
             }

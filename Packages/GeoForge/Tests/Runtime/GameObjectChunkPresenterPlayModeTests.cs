@@ -23,6 +23,8 @@ namespace Spellbound.GeoForge.Tests {
         private const int SurfaceChecks = 200;
         private const float EdgeMargin = 0.05f;
         private const float WholeVoxelTolerance = 0.001f;
+        private const float ViewerCollisionRadius = 64f;
+        private const float ViewerDetailRadius = 1000f;
 
         private readonly List<GameObject> _created = new();
 
@@ -46,11 +48,21 @@ namespace Spellbound.GeoForge.Tests {
             yield return CreateMeshedSampleVolume();
 
             var drawnLeaves = DrawnLeaves();
+            var colliders = _volume.GetComponentsInChildren<MeshCollider>()
+                .Where(meshCollider => meshCollider.sharedMesh != null)
+                .ToArray();
 
             Assert.IsNotEmpty(drawnLeaves);
+            Assert.IsNotEmpty(colliders);
 
-            foreach (var leaf in drawnLeaves)
+            foreach (var leaf in drawnLeaves) {
                 Assert.IsTrue(leaf.gameObject.activeInHierarchy, $"{leaf.name} is not visible.");
+                Assert.IsFalse(leaf.TryGetComponent<MeshCollider>(out _), $"{leaf.name} carries a collider.");
+
+                var leafCollider = colliders.FirstOrDefault(meshCollider => meshCollider.sharedMesh == leaf.sharedMesh);
+                Assert.IsNotNull(leafCollider, $"No collider holds the mesh of {leaf.name}.");
+                Assert.IsTrue(leafCollider.gameObject.activeInHierarchy, $"{leafCollider.name} is not active.");
+            }
         }
 
         [UnityTest]
@@ -92,8 +104,6 @@ namespace Spellbound.GeoForge.Tests {
         }
 
         private IEnumerator CreateMeshedSampleVolume(bool fromThePrefab = true) {
-            Track(new GameObject("Level Of Detail Camera", typeof(Camera)));
-
             GeoForgeManager manager;
 
             if (fromThePrefab) {
@@ -111,7 +121,11 @@ namespace Spellbound.GeoForge.Tests {
 
             Assert.IsInstanceOf<GameObjectChunkPresenter>(manager.Presenter);
 
-            _volume = Track(Object.Instantiate(Load<GameObject>(VolumePrefabPath))).GetComponent<GeoVolume>();
+            _volume = Track(Object.Instantiate(Load<GameObject>(VolumePrefabPath), manager.transform))
+                .GetComponent<GeoVolume>();
+            ((IGeoVolume)_volume).SetViewers(new[] {
+                new ChunkViewer(_volume.transform.position, ViewerCollisionRadius, ViewerDetailRadius)
+            });
 
             for (var frame = 0; frame < FrameBudget && !AllChunksMeshed(); frame++)
                 yield return null;
@@ -133,8 +147,7 @@ namespace Spellbound.GeoForge.Tests {
         private MeshFilter[] DrawnLeaves() {
             return _volume.GetComponentsInChildren<MeshFilter>()
                 .Where(filter => filter.sharedMesh != null && filter.sharedMesh.vertexCount > 0)
-                .Where(filter => filter.TryGetComponent<MeshCollider>(out var meshCollider) &&
-                                 meshCollider.sharedMesh != null)
+                .Where(filter => !filter.transform.parent.TryGetComponent<MeshFilter>(out _))
                 .ToArray();
         }
 

@@ -10,11 +10,9 @@ namespace Spellbound.GeoForge.Tests {
 
         public Transform VolumeTransform => transform;
 
-        public GeoVolumeEngine GeoVolumeEngine => null;
+        public GeoVolumeEngine GeoVolumeEngine { get; set; }
 
         public Vector2[] ViewDistanceLodRanges { get; set; } = Array.Empty<Vector2>();
-
-        public Transform LodTarget => null;
 
         public bool IsMoving { get; set; }
 
