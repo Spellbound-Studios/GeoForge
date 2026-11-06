@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System.Collections.Generic;
 using Unity.Mathematics;
@@ -135,25 +135,34 @@ namespace Spellbound.GeoForge.Sample1 {
             }
 #else
             if (Input.GetKeyDown(KeyCode.Alpha1)
-                        && Physics.Raycast(
-                        transform.position,
-                        transform.forward,
-                        out var hit,
-                        terraformRange,
-                        ~0)){
-                GeoForgeStatic.RemoveSphereAll(hit, terraformSize, terraformStrength, diggableMaterialList);
-            }
-                    
-                else if (Input.GetKeyDown(KeyCode.Alpha2
-                         && Physics.Raycast(
-                        transform.position,
-                        transform.forward,
-                        out hit,
-                        terraformRange,
-                        ~0)){
-                GeoForgeStatic.AddSphere(hit, terraformSize, terraformStrength, addableMaterial);
-                }
+                && Physics.Raycast(transform.position, transform.forward, out var hit, terraformRange, ~0)) {
+                var iVolume = hit.collider.transform.GetComponentInParent<IGeoVolume>();
 
+                if (iVolume != null) {
+                    GeoForgeCommands.RemoveSphere(
+                        iVolume,
+                        hit.point,
+                        radius: terraformSize,
+                        delta: terraformStrength,
+                        allowedMaterialsMask: digMaskDefinition.GetMask()
+                    );
+                }
+            }
+            else if (Input.GetKeyDown(KeyCode.Alpha2)
+                     && Physics.Raycast(transform.position, transform.forward, out hit, terraformRange, ~0)) {
+                var iVolume = hit.collider.transform.GetComponentInParent<IGeoVolume>();
+
+                if (iVolume != null) {
+                    GeoForgeCommands.AddSphere(
+                        iVolume,
+                        hit.point,
+                        radius: terraformSize,
+                        delta: terraformStrength,
+                        material: addableMaterial,
+                        allowedMaterialsMask: digMaskDefinition.GetMask()
+                    );
+                }
+            }
 #endif
         }
 

@@ -1,5 +1,6 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
+using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
 
@@ -35,7 +36,8 @@ namespace Spellbound.GeoForge {
         Vector3Int ChunkCoord => GeoChunkEngine.ChunkCoord;
 
         /// <summary>
-        ///     Contains the smallest and largest Density. Used as a shortcut to read whether a geoChunk has any mesh at all.
+        ///     Contains the smallest and largest Density. Used as a shortcut to read whether a geoChunk has any mesh
+        ///     at all.
         /// </summary>
         DensityRange DensityRange => GeoChunkEngine.DensityRange;
 
@@ -74,7 +76,12 @@ namespace Spellbound.GeoForge {
         void SetVoxels(Vector3Int chunkCoord,
             BlobAssetReference<VolumeConfigBlobAsset> configBlobAsset,
             GeoForgeDataGenerator geoDataGenerator) {
-            GeoChunkEngine.SetVoxels(geoDataGenerator.GenerateProceduralVoxels(chunkCoord, configBlobAsset));
+            SetVoxels(ChunkFillRequest.ForChunk(chunkCoord, configBlobAsset.Value, uint.MinValue),
+                GeoForgeKit.CreateDensitySource(geoDataGenerator, configBlobAsset));
+        }
+
+        void SetVoxels(in ChunkFillRequest request, IDensitySource source) {
+            GeoChunkEngine.SetVoxels(request, source);
         }
 
         void SetBoundaryOverrides(Vector3Int chunkCoord,
@@ -99,11 +106,15 @@ namespace Spellbound.GeoForge {
             GeoChunkEngine.BroadcastNewLeafAcrossChunks(newLeaf, pos, index);
         }
 
+        void BroadcastReleasedLeafAcrossChunks(Vector3Int pos, int index) {
+            GeoChunkEngine.BroadcastReleasedLeafAcrossChunks(pos, index);
+        }
+
         // Schedule-only half of LOD validation, used by GeoVolume.ValidateChunkLodsAsync to batch
         // up to ValidatesPerFrame chunks before completing march jobs once for the whole batch.
         // See GeoChunk.ScheduleOctreeLodValidation for the ordering contract with ReleaseLodValidation.
-        void ScheduleOctreeLodValidation(Vector3 playerPosition) {
-            GeoChunkEngine.ScheduleOctreeLodValidation(playerPosition);
+        void ScheduleOctreeLodValidation(NativeArray<ChunkViewer> viewersVoxelSpace, IChunkInterest interest) {
+            GeoChunkEngine.ScheduleOctreeLodValidation(viewersVoxelSpace, interest);
         }
 
         void ReleaseLodValidation() {

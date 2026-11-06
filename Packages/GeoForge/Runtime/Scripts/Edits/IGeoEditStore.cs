@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Spellbound Studio Inc.
+﻿// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -18,6 +18,14 @@ namespace Spellbound.GeoForge {
         void PassVoxelEditOperation(VoxelEditOperation operation);
 
         IEnumerable<(int, VoxelData)> ReadAllEdits();
+
+        bool HasEdits {
+            get {
+                using var edits = ReadAllEdits().GetEnumerator();
+
+                return edits.MoveNext();
+            }
+        }
 
         void Clear();
     }

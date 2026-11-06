@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using Spellbound.Core.Tooling;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -38,6 +37,7 @@ namespace Spellbound.GeoForge {
         private readonly HashSet<(int Lod, Vector3Int LocalPosition)> _knownEmptyOctreeAddresses = new();
 
         private readonly GeoForgeManager _mcManager;
+        private readonly int[] _presentedLeavesPerLevel;
 
         private BoundsInt _bounds;
         private DensityRange _densityRange;
@@ -58,8 +58,9 @@ namespace Spellbound.GeoForge {
             var voxelMin = chunkCoord * config.ChunkSize;
             _bounds = new BoundsInt(voxelMin, config.ChunkSize * Vector3Int.one);
             Transform.gameObject.name = chunkCoord.ToString();
-            _mcManager = SingletonManager.GetSingletonInstance<GeoForgeManager>();
+            _mcManager = ParentGeoVolume.GeoVolumeEngine.Manager;
             _voxelOverrides = new VoxelOverrides();
+            _presentedLeavesPerLevel = new int[config.LevelsOfDetail + 1];
         }
 
         public IGeoEditStore IGeoEditStore { get; }
@@ -85,6 +86,7 @@ namespace Spellbound.GeoForge {
         /// </summary>
         public bool MeshReady { get; private set; }
 
+        internal int FinestBuiltLevel { get; private set; } = ChunkResidency.NoBuiltLevel;
 
         public void Dispose() {
             // Idempotent by design, not by accident: everything this touches downstream (event
@@ -100,6 +102,7 @@ namespace Spellbound.GeoForge {
             _isDisposed = true;
 
             IGeoEditStore.OnGeoEditChanged -= HandleResolvedVoxelEdits;
+            ReleaseResidency();
             ParentGeoVolume.GeoVolumeEngine.ChunkDict.Remove(ChunkCoord);
             RootNode?.Dispose();
 
@@ -166,22 +169,50 @@ namespace Spellbound.GeoForge {
             if (!ApplyVoxelEdits(newVoxelChanges, out var editBounds))
                 return;
 
-            ScheduleOctreeEditValidation(editBounds);
+            var volumeEngine = ParentGeoVolume.GeoVolumeEngine;
+            volumeEngine.HoldEvents();
 
-            _mcManager.CompleteAndApplyMarchingCubesJobs();
-            _mcManager.ReleaseVoxelArray(ParentGeoVolume.ConfigBlob.Value.ChunkSize, this, true);
+            try {
+                ScheduleOctreeEditValidation(editBounds);
+
+                _mcManager.CompleteAndApplyMarchingCubesJobs();
+                _mcManager.ReleaseVoxelArray(ParentGeoVolume.ConfigBlob.Value.ChunkSize, this, true);
+
+                var chunkOrigin = ChunkCoord * ParentGeoVolume.ConfigBlob.Value.ChunkSize;
+                volumeEngine.RaiseChanged(ChunkCoord,
+                    new BoundsInt(editBounds.position + chunkOrigin, editBounds.size));
+            }
+            finally {
+                volumeEngine.ReleaseHeldEvents();
+            }
+        }
+
+        public void SetVoxels(in ChunkFillRequest request, IDensitySource source) {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+
+            var dataWidth = ParentGeoVolume.ConfigBlob.Value.ChunkDataWidthSize;
+
+            if (request.DataWidth != dataWidth)
+                throw new ArgumentException(
+                    $"A fill of data width {request.DataWidth} does not fit a chunk of data width {dataWidth}.",
+                    nameof(request));
+
+            SetVoxels(GeoForgeKit.Generate(source, request, Allocator.Persistent));
         }
 
         public void SetVoxels(NativeArray<VoxelData> voxels) {
             if (!voxels.IsCreated) {
                 Debug.LogError(
-                    $"_sparseVoxels being initialized with native array that has not been created for chunkCoord {ChunkCoord}.");
+                    "_sparseVoxels being initialized with native array that has not been created for chunkCoord " +
+                    $"{ChunkCoord}.");
 
                 return;
             }
 
             VoxelsReady = false;
             MeshReady = false;
+            FinestBuiltLevel = ChunkResidency.NoBuiltLevel;
 
             if (_sparseVoxels.IsCreated) _sparseVoxels.Dispose();
             _sparseVoxels = new NativeList<SparseVoxelData>(Allocator.Persistent);
@@ -213,11 +244,16 @@ namespace Spellbound.GeoForge {
             _mcManager.InvalidateChunkResidency(ParentGeoVolume.ConfigBlob.Value.ChunkSize, this);
 
             if (RootNode != null) RootNode.Dispose();
+            Array.Clear(_presentedLeavesPerLevel, 0, _presentedLeavesPerLevel.Length);
 
             RootNode = new OctreeNode(Vector3Int.zero, ParentGeoVolume.ConfigBlob.Value.LevelsOfDetail, _implementer,
                 ParentGeoVolume);
 
             VoxelsReady = true;
+            RaiseResidency(ChunkResidencyState.Resident);
+            ParentGeoVolume.GeoVolumeEngine?.RaiseChanged(ChunkCoord,
+                new BoundsInt(ChunkCoord * ParentGeoVolume.ConfigBlob.Value.ChunkSize,
+                    Vector3Int.one * ParentGeoVolume.ConfigBlob.Value.ChunkDataWidthSize));
 
             // A skippable density range means this chunk will never produce a leaf/mesh at all -
             // OctreeNode.ValidateOctreeLods early-returns on DensityRange.IsSkippable() before it
@@ -327,6 +363,27 @@ namespace Spellbound.GeoForge {
             neighborChunk.BroadcastNewLeafAcrossChunks(newLeaf, neighborLocalPos, index);
         }
 
+        public void BroadcastReleasedLeafAcrossChunks(Vector3Int pos, int index) {
+            ref var config = ref ParentGeoVolume.ConfigBlob.Value;
+
+            var worldVoxelPos = pos + ChunkCoord * config.ChunkSize;
+
+            if (_bounds.Contains(worldVoxelPos)) {
+                RootNode?.ClearTransitionTowardReleasedNeighbor(pos, GfStaticHelper.GetTransitionFaceMask(index));
+
+                return;
+            }
+
+            var neighborCoord = GfStaticHelper.GetNeighborCoord(index, ChunkCoord);
+            var neighborChunk = ParentGeoVolume.GetChunkByCoord(neighborCoord);
+
+            if (neighborChunk == null)
+                return;
+
+            var neighborLocalPos = worldVoxelPos - neighborCoord * config.ChunkSize;
+            neighborChunk.BroadcastReleasedLeafAcrossChunks(neighborLocalPos, index);
+        }
+
         public VoxelData GetVoxelData(int index) {
             ref var config = ref ParentGeoVolume.ConfigBlob.Value;
 
@@ -429,12 +486,11 @@ namespace Spellbound.GeoForge {
         // CompleteAndApplyMarchingCubesJobs() has run for the whole batch - releasing any earlier
         // would let another chunk's LRU claim on the Validation pool overwrite this array while a
         // still-pending march job on a worker thread is reading it.
-        public void ScheduleOctreeLodValidation(Vector3 playerPosition) {
+        public void ScheduleOctreeLodValidation(NativeArray<ChunkViewer> viewersVoxelSpace, IChunkInterest interest) {
             if (!_sparseVoxels.IsCreated)
                 return;
 
-            var playerPositionChunkSpace = playerPosition - _bounds.min;
-            RootNode.ValidateOctreeLods(playerPositionChunkSpace, GetVoxelDataArray(false));
+            RootNode.ValidateOctreeLods(viewersVoxelSpace.AsReadOnlySpan(), interest, GetVoxelDataArray(false));
         }
 
         // Releases this chunk's Validation-pool checkout. Only valid to call after
@@ -443,6 +499,47 @@ namespace Spellbound.GeoForge {
         public void ReleaseLodValidation() {
             _mcManager.ReleaseVoxelArray(ParentGeoVolume.ConfigBlob.Value.ChunkSize, this, false);
             SetMeshReady();
+        }
+
+        internal void HandleLeafPresented(int levelOfDetail) {
+            _presentedLeavesPerLevel[levelOfDetail]++;
+            RefreshFinestBuiltLevel();
+        }
+
+        internal void HandleLeafReleased(int levelOfDetail) {
+            if (_isDisposed || !VoxelsReady)
+                return;
+
+            _presentedLeavesPerLevel[levelOfDetail]--;
+            RefreshFinestBuiltLevel();
+        }
+
+        private void RefreshFinestBuiltLevel() {
+            var finestBuiltLevel = Array.FindIndex(_presentedLeavesPerLevel, count => count > 0);
+
+            if (finestBuiltLevel == FinestBuiltLevel)
+                return;
+
+            FinestBuiltLevel = finestBuiltLevel;
+            RaiseResidency(ChunkResidencyState.Resident);
+        }
+
+        internal bool HasEdits() {
+            return IGeoEditStore.HasEdits;
+        }
+
+        private void ReleaseResidency() {
+            if (!VoxelsReady)
+                return;
+
+            VoxelsReady = false;
+            FinestBuiltLevel = ChunkResidency.NoBuiltLevel;
+            RaiseResidency(ChunkResidencyState.Released);
+        }
+
+        private void RaiseResidency(ChunkResidencyState state) {
+            ParentGeoVolume.GeoVolumeEngine?.RaiseResidencyChanged(new ChunkResidency(ChunkCoord, state,
+                FinestBuiltLevel));
         }
 
         // Idempotent: mesh-ready should only ever notify once per SetVoxels call - both SetVoxels

@@ -1,6 +1,6 @@
-﻿// Copyright 2026 Spellbound Studio Inc.
+﻿// Copyright (c) Spellbound Studios. All rights reserved.
 
-using Spellbound.Core.Tooling;
+using Spellbound.Core.Logging;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -94,8 +94,10 @@ namespace Spellbound.GeoForge {
             float radius,
             float thickness,
             uint4 allowedMaterialsMask) {
-            if (!SingletonManager.TryGetSingletonInstance<GeoForgeManager>(out var gfManager)) {
-                Debug.LogError("TerraformArcCommand: GeoForgeManager not found. Ensure it's in the current scene.");
+            var gfManager = geoVolume.GeoVolumeEngine?.Manager;
+
+            if (gfManager == null) {
+                Log.Error($"{nameof(TerraformArcCommand)}: the volume holds no {nameof(GeoForgeManager)}.");
 
                 return false;
             }
@@ -172,7 +174,7 @@ namespace Spellbound.GeoForge {
             job.Schedule(voxelCount, 32).Complete();
 
             // No delta parameter (arc always subtracts, per the original's own reasoning) - 0 as
-            // materialIndex mirrors GeoForgeStatic.RemoveArc's own placeholder value, since a dig
+            // materialIndex is a placeholder value, since a dig
             // never crosses from empty into full and materialIndex is never actually read by the
             // crossing rule downstream for this shape.
             TerraformCommandUtility.DispatchEdits(

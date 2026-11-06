@@ -1,7 +1,8 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Spellbound.GeoForge {
@@ -11,11 +12,9 @@ namespace Spellbound.GeoForge {
     public abstract class DataFactory : GeoForgeDataGenerator {
         protected Vector3Int GetChunkOrigin(
             Vector3Int chunkCoord, in VolumeConfigBlobAsset config) {
-            return new Vector3Int(
-                chunkCoord.x * config.ChunkSize + config.Offset.x,
-                chunkCoord.y * config.ChunkSize + config.Offset.y,
-                chunkCoord.z * config.ChunkSize + config.Offset.z
-            );
+            var origin = ChunkLayout.ChunkOrigin(new int3(chunkCoord.x, chunkCoord.y, chunkCoord.z), config);
+
+            return new Vector3Int(origin.x, origin.y, origin.z);
         }
 
         protected Vector3Int GetVoxelPosition(
@@ -35,9 +34,7 @@ namespace Spellbound.GeoForge {
         }
 
         protected sbyte SignedDistanceToDensity(float signedDistance, float gradient) {
-            var density = -signedDistance * gradient;
-
-            return (sbyte)Mathf.Clamp(density, sbyte.MinValue, sbyte.MaxValue);
+            return VoxelEncoding.DensityFromSignedDistance(signedDistance, gradient);
         }
 
         public abstract void FillDataArray(

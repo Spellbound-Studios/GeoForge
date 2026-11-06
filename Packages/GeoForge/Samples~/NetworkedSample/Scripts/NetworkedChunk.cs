@@ -1,4 +1,4 @@
-﻿// Copyright 2025 Spellbound Studio Inc.
+﻿// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System.Collections.Generic;
 using PurrNet;
@@ -20,9 +20,9 @@ namespace GeoForge.Sample4 {
     /// 
     /// This script is intended to give users a robust example of how they might structure terrain chunks using the
     /// Marching Cubes API as well as the PurrNet framework. The script leverages PurrNet's lifecycles, network identity
-    /// callbacks, NetworkModules, and the visibility system to handle ownership tracking, exchange, and handoffs to allow users
-    /// to seamlessly swap between server authoritative and local terraforming based on client proximity. This capability
-    /// creates lag-free environment regardless of host ping and location.
+    /// callbacks, NetworkModules, and the visibility system to handle ownership tracking, exchange, and handoffs to
+    /// allow users to seamlessly swap between server authoritative and local terraforming based on client proximity.
+    /// This capability creates lag-free environment regardless of host ping and location.
     ///
     /// Edit application hook: GeoChunk's own constructor subscribes PassVoxelEdits to
     /// IGeoEditStore.OnGeoEditChanged automatically, every time a GeoChunk is constructed - that
@@ -102,11 +102,13 @@ namespace GeoForge.Sample4 {
             if (observers.Count <= 1 || !hasOwner)
                 return;
 
-            // Otherwise it does have an owner, and it has more than one observer and therefore should be owned by the server.
+            // Otherwise it does have an owner, and it has more than one observer and therefore should be owned by the
+            // server.
             RemoveOwnership();
 
             Debug.Log(
-                $"[Server] Chunk {GeoChunkEngine?.ChunkCoord} - Multiple observers ({observers.Count}), server taking authority");
+                $"[Server] Chunk {GeoChunkEngine?.ChunkCoord} - Multiple observers ({observers.Count}), " +
+                "server taking authority");
         }
 
         /// <summary>
@@ -134,7 +136,8 @@ namespace GeoForge.Sample4 {
             GiveOwnership(isolatedPlayer);
 
             Debug.Log(
-                $"[Server] Chunk {GeoChunkEngine?.ChunkCoord} - Single observer remaining, giving ownership to {isolatedPlayer}");
+                $"[Server] Chunk {GeoChunkEngine?.ChunkCoord} - Single observer remaining, giving ownership to " +
+                $"{isolatedPlayer}");
         }
 
         /// <summary>
@@ -149,7 +152,8 @@ namespace GeoForge.Sample4 {
         [TargetRpc(bufferLast: true)]
         private void SendToNewObserver(PlayerID target, Vector3Int chunkCoord) {
             // Lets error handle properly. If you're following this example then it should fit into the PurrNet
-            // lifecycle properly. However, if you're not and doing your own thing it's important to make sure it exists!
+            // lifecycle properly. However, if you're not and doing your own thing it's important to make sure it
+            // exists!
             if (GeoChunkEngine == null) {
                 Debug.LogError("[Client] GeoChunk is null. Please ensure GeoChunk is created.", this);
 

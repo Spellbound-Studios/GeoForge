@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using Unity.Burst;
 using Unity.Collections;
@@ -57,8 +57,8 @@ namespace Spellbound.GeoForge {
             // a mature high-index material (e.g. 127 + 128 = 255) doesn't fit in sbyte's -128..127 range.
             public byte RawMaterial;
 
-            public sbyte
-                Density; // density of that same original full corner (always >= 0, it's a full voxel) - used as a confidence weight
+            // density of that same original full corner (always >= 0, it's a full voxel) - used as a confidence weight
+            public sbyte Density;
         }
 
         public void Execute() {
@@ -154,7 +154,7 @@ namespace Spellbound.GeoForge {
                                 vertLocalPos1.z, chunkDataAreaSize, chunkDataWidthSize);
                             var voxel1 = VoxelArray[index1];
 
-                            var isVert0Full = voxel0.Density >= 0;
+                            var isVert0Full = VoxelEncoding.IsSolid(voxel0.Density);
 
                             // Capture the ORIGINAL cube corners (before bisection moves anything) and which
                             // one is really full. The marching-cubes case table guarantees these two original
@@ -166,11 +166,6 @@ namespace Spellbound.GeoForge {
                             var originalFullVoxel = isVert0Full ? voxel0 : voxel1;
                             var wasVoxel0Mature = voxel0.IsMature();
                             var wasVoxel1Mature = voxel1.IsMature();
-
-                            // Maturity of the ORIGINAL empty corner (the complement of originalFullVoxel,
-                            // above) - used below to decide whether the full voxel's raw material index
-                            // needs demodulating.
-                            var wasEmptyVoxelMature = isVert0Full ? wasVoxel1Mature : wasVoxel0Mature;
 
                             // Shared with the other three march jobs.
                             GfMarchHelper.SubdivideToSurfaceCrossing(
@@ -201,21 +196,8 @@ namespace Spellbound.GeoForge {
                             var normal = math.lerp(sample.Normal0, sample.Normal1, t);
                             normal = math.normalize(normal);
 
-                            // Final material is mature IFF both the full voxel and the empty voxel it's
-                            // interpolated against were mature. Rather than adding MatureBitValue onto
-                            // originalFullVoxel's raw index (the old approach - which could overflow past
-                            // 255 if the full voxel's raw index already carried the mature bit AND the
-                            // combined result was also meant to be mature), this conditionally strips the
-                            // bit instead:
-                            //  - empty voxel mature -> keep the full voxel's raw index as-is. If the full
-                            //    voxel is also mature, its raw value already has the bit set (correctly
-                            //    mature); if the full voxel is immature, its raw value is already < 128
-                            //    (correctly immature) - either way, no bit needs adding.
-                            //  - empty voxel immature -> demodulate (GetPlainMatIndex()) to force the
-                            //    result immature, regardless of the full voxel's own maturity.
-                            var packedRawMaterial = wasEmptyVoxelMature
-                                ? originalFullVoxel.MaterialIndex
-                                : originalFullVoxel.GetPlainMatIndex();
+                            var packedRawMaterial = GfMarchHelper.EdgeVertexMaterial(originalFullVoxel.MaterialIndex,
+                                wasVoxel0Mature && wasVoxel1Mature);
 
                             edgeVertex = new EdgeVertex {
                                 Position = centeredVertex,

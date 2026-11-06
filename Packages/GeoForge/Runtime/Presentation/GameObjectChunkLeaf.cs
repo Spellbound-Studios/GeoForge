@@ -6,12 +6,10 @@ namespace Spellbound.GeoForge.Presentation {
     internal sealed class GameObjectChunkLeaf : IChunkLeaf {
         private static readonly int WorldToLocalProperty = Shader.PropertyToID("_WorldToLocal");
 
-        private readonly MeshCollider _leafCollider;
         private readonly MeshFilter _leafFilter;
         private readonly LeafBehaviour _leafBehaviour;
         private readonly MeshRenderer _leafRenderer;
         private readonly MaterialPropertyBlock _propertyBlock;
-        private readonly MeshCollider _transitionCollider;
         private readonly MeshFilter _transitionFilter;
         private readonly MeshRenderer _transitionRenderer;
 
@@ -22,11 +20,9 @@ namespace Spellbound.GeoForge.Presentation {
             _propertyBlock = propertyBlock;
 
             leafObject.TryGetComponent(out _leafFilter);
-            leafObject.TryGetComponent(out _leafCollider);
             leafObject.TryGetComponent(out _leafRenderer);
             leafObject.TryGetComponent(out _leafBehaviour);
             transitionObject.TryGetComponent(out _transitionFilter);
-            transitionObject.TryGetComponent(out _transitionCollider);
             transitionObject.TryGetComponent(out _transitionRenderer);
         }
 
@@ -37,9 +33,6 @@ namespace Spellbound.GeoForge.Presentation {
         public void SetMesh(Mesh mesh, int levelOfDetail) {
             if (_leafFilter != null)
                 _leafFilter.sharedMesh = mesh;
-
-            if (_leafCollider != null)
-                _leafCollider.sharedMesh = mesh;
 
             if (_leafBehaviour != null)
                 _leafBehaviour.OnMeshUpdated(levelOfDetail);
@@ -62,14 +55,8 @@ namespace Spellbound.GeoForge.Presentation {
         }
 
         internal void ClearMeshes() {
-            if (_transitionCollider != null)
-                _transitionCollider.sharedMesh = null;
-
             if (_transitionFilter != null)
                 _transitionFilter.sharedMesh = null;
-
-            if (_leafCollider != null)
-                _leafCollider.sharedMesh = null;
 
             if (_leafFilter != null)
                 _leafFilter.sharedMesh = null;

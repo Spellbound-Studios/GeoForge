@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using Unity.Burst;
 using Unity.Collections;
@@ -102,15 +102,15 @@ namespace Spellbound.GeoForge {
                             config.ChunkDataWidthSize)];
                     }
 
-                    var caseCode = (transitionCellValues[0].Density >= 0 ? 1 : 0)
-                                   | (transitionCellValues[1].Density >= 0 ? 2 : 0)
-                                   | (transitionCellValues[2].Density >= 0 ? 4 : 0)
-                                   | (transitionCellValues[5].Density >= 0 ? 8 : 0)
-                                   | (transitionCellValues[8].Density >= 0 ? 16 : 0)
-                                   | (transitionCellValues[7].Density >= 0 ? 32 : 0)
-                                   | (transitionCellValues[6].Density >= 0 ? 64 : 0)
-                                   | (transitionCellValues[3].Density >= 0 ? 128 : 0)
-                                   | (transitionCellValues[4].Density >= 0 ? 256 : 0);
+                    var caseCode = (VoxelEncoding.IsSolid(transitionCellValues[0].Density) ? 1 : 0)
+                                   | (VoxelEncoding.IsSolid(transitionCellValues[1].Density) ? 2 : 0)
+                                   | (VoxelEncoding.IsSolid(transitionCellValues[2].Density) ? 4 : 0)
+                                   | (VoxelEncoding.IsSolid(transitionCellValues[5].Density) ? 8 : 0)
+                                   | (VoxelEncoding.IsSolid(transitionCellValues[8].Density) ? 16 : 0)
+                                   | (VoxelEncoding.IsSolid(transitionCellValues[7].Density) ? 32 : 0)
+                                   | (VoxelEncoding.IsSolid(transitionCellValues[6].Density) ? 64 : 0)
+                                   | (VoxelEncoding.IsSolid(transitionCellValues[3].Density) ? 128 : 0)
+                                   | (VoxelEncoding.IsSolid(transitionCellValues[4].Density) ? 256 : 0);
 
                     transitionCurrentCache[0 * config.CubesMarchedPerOctreeLeaf + x] = default;
                     transitionCurrentCache[1 * config.CubesMarchedPerOctreeLeaf + x] = default;
@@ -178,7 +178,7 @@ namespace Spellbound.GeoForge {
                             var initIndex0 = GfStaticHelper.Coord3DToIndex(corner0Copy.x, corner0Copy.y,
                                 corner0Copy.z, config.ChunkDataAreaSize, config.ChunkDataWidthSize);
                             var initVoxel0 = VoxelArray[initIndex0];
-                            var isVert0Full = initVoxel0.Density >= 0;
+                            var isVert0Full = VoxelEncoding.IsSolid(initVoxel0.Density);
 
                             var initIndex1 = GfStaticHelper.Coord3DToIndex(corner1Copy.x, corner1Copy.y,
                                 corner1Copy.z, config.ChunkDataAreaSize, config.ChunkDataWidthSize);
@@ -215,15 +215,8 @@ namespace Spellbound.GeoForge {
                             var vertex = math.lerp(corner0Copy, corner1Copy, t);
                             var centeredVertex = (vertex + config.OffsetBurst) * config.Resolution;
 
-                            // materialIndexOnly is already the demodulated 0-127 index (VoxelData.MaterialIndex
-                            // returns it pre-stripped). Maturity is packed back in additively, matching the
-                            // shader's raw-byte contract - NOT via sign, which can't distinguish material 0
-                            // mature from material 0 immature (there's no negative zero). Same fix as
-                            // FlatBaryMarchJob.
-                            var materialIndexOnly = originalFullVoxel.MaterialIndex;
-                            var combinedIsMature = wasVoxel0Mature && wasVoxel1Mature;
-                            var packedRawMaterial =
-                                (byte)(materialIndexOnly + (combinedIsMature ? VoxelData.MatureBitValue : 0));
+                            var packedRawMaterial = GfMarchHelper.EdgeVertexMaterial(originalFullVoxel.MaterialIndex,
+                                wasVoxel0Mature && wasVoxel1Mature);
 
                             edgeVertex = new EdgeVertex {
                                 Position = centeredVertex,

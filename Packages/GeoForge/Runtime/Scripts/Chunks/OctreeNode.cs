@@ -1,7 +1,6 @@
 // Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
-using Spellbound.Core.Tooling;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
@@ -18,17 +17,23 @@ namespace Spellbound.GeoForge {
         private readonly GeoForgeManager _gfManager;
         private readonly Vector3Int _localPosition;
         private readonly int _lod;
+        private readonly Vector3 _centreVoxelSpace;
         private readonly IGeoVolume _parentGeoVolume;
 
         private NativeList<int> _allTransitionTriangles;
         private BoundsInt _boundsVoxel;
+        private bool _broadcastsNewLeaf;
         private Vector3Int[] _cachedNeighborPositions;
         private OctreeNode[] _children;
+        private IChunkCollisionLeaf _collisionLeaf;
+        private IChunkCollisionPresenter _collisionLeafPresenter;
         private NativeList<int> _filteredTransitionTriangles;
         private IChunkLeaf _leaf;
         private bool _leafInitialized;
+        private bool _meshPresented;
         private bool _awaitsPresenter;
         private IChunkPresenter _leafPresenter;
+        private IChunkCollisionPresenter _refusingCollisionPresenter;
         private IChunkPresenter _refusingPresenter;
         private Mesh _mesh;
         private bool _transitionDirtyFlag;
@@ -42,14 +47,21 @@ namespace Spellbound.GeoForge {
             _lod = lod;
             _geoChunk = geoChunk;
 
-            _gfManager = SingletonManager.GetSingletonInstance<GeoForgeManager>();
+            _gfManager = _parentGeoVolume.GeoVolumeEngine.Manager;
             var octreeSizeVoxels = 3 + (_parentGeoVolume.ConfigBlob.Value.CubesMarchedPerOctreeLeaf << _lod);
             _boundsVoxel = new BoundsInt(_localPosition, Vector3Int.one * octreeSizeVoxels);
+            _centreVoxelSpace = Center + geoChunk.ChunkCoord * _parentGeoVolume.ConfigBlob.Value.ChunkSize;
         }
 
         private Vector3 Center => (_boundsVoxel.min + _boundsVoxel.max - Vector3.one) * 0.5f;
 
         private bool IsLeaf => _children == null;
+
+        private bool HasAnyLeaf => _leaf != null || _collisionLeaf != null;
+
+        internal Mesh CollisionMesh => _collisionLeaf != null ? _mesh : null;
+
+        internal int LevelOfDetail => _lod;
 
         public void Dispose() {
             if (_children != null) {
@@ -130,20 +142,53 @@ namespace Spellbound.GeoForge {
         }
 
         private void ReleaseLeafObjects() {
-            if (_leaf == null)
+            if (!HasAnyLeaf)
                 return;
 
+            var wasPresented = _meshPresented;
+
             try {
-                _leafPresenter.Release(_leaf);
+                _leafPresenter?.Release(_leaf);
             }
             finally {
-                _leaf = null;
-                _leafPresenter = null;
-                DestroyMesh(ref _transitionMesh);
-                DestroyMesh(ref _mesh);
-                _gfManager.OctreeBatchTransitionUpdate -= HandleTransitionUpdate;
-                _transitionDirtyFlag = false;
+                try {
+                    _collisionLeafPresenter?.Release(_collisionLeaf);
+                }
+                finally {
+                    _leaf = null;
+                    _leafPresenter = null;
+                    _collisionLeaf = null;
+                    _collisionLeafPresenter = null;
+                    _broadcastsNewLeaf = false;
+                    _meshPresented = false;
+                    DestroyMesh(ref _transitionMesh);
+                    DestroyMesh(ref _mesh);
+                    _gfManager.OctreeBatchTransitionUpdate -= HandleTransitionUpdate;
+                    _transitionDirtyFlag = false;
+
+                    if (wasPresented)
+                        _geoChunk.GeoChunkEngine.HandleLeafReleased(_lod);
+                }
             }
+        }
+
+        private void Withdraw() {
+            if (_children != null) {
+                for (var i = 0; i < 8; i++) {
+                    _children[i].Withdraw();
+                    _children[i].Dispose();
+                }
+
+                _children = null;
+            }
+
+            var hadDrawnLeaf = _leaf != null;
+            ReleaseLeafObjects();
+            _leafInitialized = false;
+            _awaitsPresenter = false;
+
+            if (hadDrawnLeaf)
+                BroadcastReleasedLeaf();
         }
 
         private static void DestroyMesh(ref Mesh mesh) {
@@ -158,7 +203,7 @@ namespace Spellbound.GeoForge {
         }
 
         internal void ValidateMaterial() {
-            if (_leaf != null) {
+            if (HasAnyLeaf) {
                 SetMaterialOrigin();
 
                 return;
@@ -170,19 +215,53 @@ namespace Spellbound.GeoForge {
         }
 
         private bool HasPresenterToAsk() {
-            var presenter = _gfManager.Presenter;
+            if (_leaf == null) {
+                var presenter = _gfManager.Presenter;
 
-            return presenter != null && presenter != _refusingPresenter;
+                if (presenter != null && presenter != _refusingPresenter)
+                    return true;
+            }
+
+            if (_collisionLeaf != null)
+                return false;
+
+            var collisionPresenter = _gfManager.CollisionPresenter;
+
+            return collisionPresenter != null && collisionPresenter != _refusingCollisionPresenter;
         }
 
         private void SetMaterialOrigin() {
-            _leaf.SetVolumeMatrix(_parentGeoVolume.VolumeTransform.worldToLocalMatrix);
+            var worldToLocal = _parentGeoVolume.VolumeTransform.worldToLocalMatrix;
+            _leaf?.SetVolumeMatrix(worldToLocal);
+            _collisionLeaf?.SetVolumeMatrix(worldToLocal);
         }
 
-        internal void ValidateOctreeLods(Vector3 playerPosition, NativeArray<VoxelData> voxelArray) {
-            var targetLod = GetLodRange(Center, playerPosition, _parentGeoVolume.ConfigBlob.Value.Resolution);
+        internal void ValidateOctreeLods(
+            ReadOnlySpan<ChunkViewer> viewersVoxelSpace, IChunkInterest interest, NativeArray<VoxelData> voxelArray) {
+            var levelOfDetailRanges = _parentGeoVolume.GeoVolumeEngine.ReadLevelOfDetailRanges();
+            var chunkHasEdits = _geoChunk.GeoChunkEngine.HasEdits();
+            ValidateOctreeLods(viewersVoxelSpace, interest, voxelArray, levelOfDetailRanges, chunkHasEdits);
+        }
+
+        private void ValidateOctreeLods(
+            ReadOnlySpan<ChunkViewer> viewersVoxelSpace,
+            IChunkInterest interest,
+            NativeArray<VoxelData> voxelArray,
+            NativeArray<Vector2>.ReadOnly levelOfDetailRanges,
+            bool chunkHasEdits) {
+            var request = new ChunkInterestRequest(new Bounds(_centreVoxelSpace, _boundsVoxel.size - Vector3Int.one),
+                _parentGeoVolume.ConfigBlob.Value.Resolution, levelOfDetailRanges, chunkHasEdits);
+            var targetLod = interest.DetailLevel(request, viewersVoxelSpace);
 
             if (_geoChunk.DensityRange.IsSkippable()) return;
+
+            if (targetLod < 0) {
+                Withdraw();
+
+                return;
+            }
+
+            targetLod = Math.Min(targetLod, _parentGeoVolume.ConfigBlob.Value.LevelsOfDetail);
 
             if (_lod <= targetLod) {
                 if (_geoChunk.IsKnownEmpty(_lod, _localPosition))
@@ -206,7 +285,7 @@ namespace Spellbound.GeoForge {
             Subdivide();
 
             foreach (var child in _children)
-                child.ValidateOctreeLods(playerPosition, voxelArray);
+                child.ValidateOctreeLods(viewersVoxelSpace, interest, voxelArray, levelOfDetailRanges, chunkHasEdits);
         }
 
         internal void ValidateOctreeEdits(BoundsInt boundsVoxel, NativeArray<VoxelData> voxelArray) {
@@ -258,18 +337,6 @@ namespace Spellbound.GeoForge {
 
             UpdateTransitionMask(GetOppositeTransition(faceMask), false);
             neighbor.UpdateTransitionMask(faceMask, true);
-        }
-
-        private int GetLodRange(Vector3 octreePos, Vector3 playerPos, float resolution) {
-            var distance = Vector3.Distance(octreePos, playerPos) * resolution;
-
-            for (var i = 0; i < _parentGeoVolume.ViewDistanceLodRanges.Length; i++)
-                if (distance <= _parentGeoVolume.ViewDistanceLodRanges[i].y)
-                    return i;
-
-            // If distance is beyond all ranges, return -1
-            // return - 1;
-            return _parentGeoVolume.ViewDistanceLodRanges.Length - 1;
         }
 
         private void MarchAndMesh(NativeArray<VoxelData> voxelArray) {
@@ -343,41 +410,6 @@ namespace Spellbound.GeoForge {
             MarchAndMesh(voxelArray);
         }
 
-        private void UpdateLeafMesh(
-            NativeList<MeshingVertexData> vertices, NativeList<int> triangles, Bounds computedBounds) {
-            _mesh.SetVertexBufferParams(vertices.Length, MeshingVertexData.VertexBufferMemoryLayout);
-
-            _mesh.SetVertexBufferData(
-                vertices.AsArray(),
-                0,
-                0,
-                vertices.Length,
-                0,
-                MeshUpdateFlags.DontValidateIndices
-            );
-
-            _mesh.SetIndexBufferParams(triangles.Length, IndexFormat.UInt32);
-
-            _mesh.SetIndexBufferData(
-                triangles.AsArray(),
-                0,
-                0,
-                triangles.Length,
-                MeshUpdateFlags.DontValidateIndices
-            );
-
-            var subMesh = new SubMeshDescriptor(0, triangles.Length);
-            _mesh.subMeshCount = 1;
-
-            _mesh.SetSubMesh(0, subMesh);
-
-            // Computed by the march job itself (see MarchAndMesh/MarchingCubeJob.ComputedBounds)
-            // instead of scanning every vertex again here via RecalculateBounds().
-            _mesh.bounds = computedBounds;
-
-            _leaf.SetMesh(_mesh, _lod);
-        }
-
         private void BuildTransitions() {
             DestroyMesh(ref _transitionMesh);
 
@@ -397,7 +429,15 @@ namespace Spellbound.GeoForge {
                 _transitionRanges = new NativeArray<int2>(6, Allocator.Persistent);
         }
 
-        private bool TryBuildLeaf(IChunkPresenter presenter) {
+        private bool TryBuildLeaf() {
+            if (_leaf != null)
+                return false;
+
+            var presenter = _gfManager.Presenter;
+
+            if (presenter == null || presenter == _refusingPresenter)
+                return false;
+
             var leaf = presenter.Acquire(_geoChunk.GeoChunkEngine.Transform, _lod);
 
             if (leaf == null) {
@@ -410,10 +450,29 @@ namespace Spellbound.GeoForge {
             _leafPresenter = presenter;
             _leaf = leaf;
 
-            DestroyMesh(ref _mesh);
+            return true;
+        }
 
-            _mesh = new Mesh();
-            _mesh.MarkDynamic();
+        private bool TryBuildCollisionLeaf() {
+            if (_collisionLeaf != null)
+                return false;
+
+            var collisionPresenter = _gfManager.CollisionPresenter;
+
+            if (collisionPresenter == null || collisionPresenter == _refusingCollisionPresenter)
+                return false;
+
+            var collisionLeaf = collisionPresenter.Acquire(_geoChunk.GeoChunkEngine.Transform, _lod);
+
+            if (collisionLeaf == null) {
+                _refusingCollisionPresenter = collisionPresenter;
+
+                return false;
+            }
+
+            _refusingCollisionPresenter = null;
+            _collisionLeafPresenter = collisionPresenter;
+            _collisionLeaf = collisionLeaf;
 
             return true;
         }
@@ -456,7 +515,7 @@ namespace Spellbound.GeoForge {
                 _transitionDirtyFlag = false;
             }
 
-            if (!_transitionRanges.IsCreated)
+            if (!_transitionRanges.IsCreated || _transitionMesh == null)
                 return;
 
             var triangles =
@@ -507,6 +566,28 @@ namespace Spellbound.GeoForge {
                 _geoChunk.BroadcastNewLeafAcrossChunks(this, neighborVoxelPositions[i], i);
         }
 
+        private void BroadcastReleasedLeaf() {
+            var neighborVoxelPositions = GetNeighborPositions();
+
+            for (var i = 0; i < 6; i++)
+                _geoChunk.BroadcastReleasedLeafAcrossChunks(neighborVoxelPositions[i], i);
+        }
+
+        internal void ClearTransitionTowardReleasedNeighbor(
+            Vector3Int voxelPos, GfStaticHelper.TransitionFaceMask faceMask) {
+            if (!_boundsVoxel.Contains(voxelPos))
+                return;
+
+            if (!IsLeaf) {
+                foreach (var child in _children)
+                    child.ClearTransitionTowardReleasedNeighbor(voxelPos, faceMask);
+
+                return;
+            }
+
+            UpdateTransitionMask(GetOppositeTransition(faceMask), false);
+        }
+
         private Vector3Int[] GetNeighborPositions() {
             if (_cachedNeighborPositions == null) _cachedNeighborPositions = SetNeighborPositions(_boundsVoxel);
 
@@ -539,17 +620,13 @@ namespace Spellbound.GeoForge {
             };
         }
 
-        /// <summary>
-        ///     Called once the march job(s) for this node have completed. If there's nothing to show,
-        ///     releases any existing leaf objects (an edit may have just emptied out a previously
-        ///     visible leaf) and stops - no GameObject/Mesh gets created for a leaf with no geometry,
-        ///     and no BroadcastNewLeaf, since neighbors don't need a transition seam against a leaf
-        ///     with nothing to show. Otherwise, builds the leaf objects on first use only (isFirstBuild),
-        ///     updates the mesh, and broadcasts only on that same first transition from empty to
-        ///     non-empty - matching the original one-time MakeLeaf behavior, just re-anchored to
-        ///     "first time this leaf actually has geometry" instead of "first time MakeLeaf ran."
-        /// </summary>
         internal void ApplyMarchResults(
+            NativeList<MeshingVertexData> vertices, NativeList<int> triangles, Bounds computedBounds) {
+            if (PrepareMarchResults(vertices, triangles, computedBounds))
+                PresentMarchResults();
+        }
+
+        internal bool PrepareMarchResults(
             NativeList<MeshingVertexData> vertices, NativeList<int> triangles, Bounds computedBounds) {
             if (triangles.Length < 3 || vertices.Length < 3) {
                 ReleaseLeafObjects();
@@ -563,36 +640,92 @@ namespace Spellbound.GeoForge {
                 // this can never go stale silently.
                 _geoChunk.MarkKnownEmpty(_lod, _localPosition);
 
-                return;
+                return false;
             }
 
-            var isFirstBuild = _leaf == null;
+            var builtLeaf = TryBuildLeaf();
+            var builtCollisionLeaf = TryBuildCollisionLeaf();
 
-            if (isFirstBuild) {
-                var presenter = _gfManager.Presenter;
+            if (!HasAnyLeaf) {
+                _awaitsPresenter = true;
 
-                if (presenter == null || !TryBuildLeaf(presenter)) {
-                    _awaitsPresenter = true;
+                return false;
+            }
 
-                    return;
-                }
+            _awaitsPresenter = _leaf == null || _collisionLeaf == null;
 
-                _awaitsPresenter = false;
+            if (_mesh == null) {
+                _mesh = new Mesh();
+                _mesh.MarkDynamic();
+            }
+
+            var worldToLocal = _parentGeoVolume.VolumeTransform.worldToLocalMatrix;
+
+            if (builtLeaf) {
                 BuildTransitions();
-                SetMaterialOrigin();
+                _leaf.SetVolumeMatrix(worldToLocal);
+                _broadcastsNewLeaf = true;
             }
 
-            UpdateLeafMesh(vertices, triangles, computedBounds);
+            if (builtCollisionLeaf)
+                _collisionLeaf.SetVolumeMatrix(worldToLocal);
 
-            if (isFirstBuild)
-                BroadcastNewLeaf();
+            GeoForgeKit.WriteMesh(_mesh, vertices.AsArray(), triangles.AsArray(), computedBounds);
 
-            // HandleTransitionUpdate is NOT called here anymore - it needs _allTransitionTriangles/
-            // _transitionRanges to already hold this pass's actual transition triangle data, which
-            // only ApplyTransitionMarchResults provides. GeoForgeManager.CompleteAndApplyMarchingCubesJobs
-            // applies main march results (this method) before transition results specifically so
-            // that BuildTransitions above has already run - and run first - by the time
-            // ApplyTransitionMarchResults needs _transitionMesh/_allTransitionTriangles to exist.
+            return true;
+        }
+
+        internal void PresentMarchResults() {
+            _leaf?.SetMesh(_mesh, _lod);
+            _collisionLeaf?.SetMesh(_mesh);
+            if (!_meshPresented) {
+                _meshPresented = true;
+                _geoChunk.GeoChunkEngine.HandleLeafPresented(_lod);
+            }
+
+            if (!_broadcastsNewLeaf)
+                return;
+
+            _broadcastsNewLeaf = false;
+            BroadcastNewLeaf();
+        }
+
+        internal bool IsRegionReady(
+            Vector3Int regionMinimum, Vector3Int regionMaximum, ReadinessScope scope, bool requiresCollider) {
+            if (_children == null)
+                return IsLeafReady(scope, requiresCollider);
+
+            var split = _localPosition + Vector3Int.one *
+                (_parentGeoVolume.ConfigBlob.Value.CubesMarchedPerOctreeLeaf << (_lod - 1));
+
+            for (var i = 0; i < 8; i++) {
+                if (!HalfOverlaps((i & 1) != 0, regionMinimum.x, regionMaximum.x, split.x)
+                    || !HalfOverlaps((i & 2) != 0, regionMinimum.y, regionMaximum.y, split.y)
+                    || !HalfOverlaps((i & 4) != 0, regionMinimum.z, regionMaximum.z, split.z))
+                    continue;
+
+                if (!_children[i].IsRegionReady(regionMinimum, regionMaximum, scope, requiresCollider))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool HalfOverlaps(bool upperHalf, int minimum, int maximum, int split) {
+            return upperHalf ? maximum >= split : minimum < split;
+        }
+
+        private bool IsLeafReady(ReadinessScope scope, bool requiresCollider) {
+            if (scope == ReadinessScope.FinestLevel && _lod != 0)
+                return false;
+
+            if (_geoChunk.IsKnownEmpty(_lod, _localPosition))
+                return true;
+
+            if (requiresCollider)
+                return _collisionLeaf != null && _collisionLeaf.HasMesh;
+
+            return _mesh != null && HasAnyLeaf;
         }
 
         internal void ApplyTransitionMarchResults(

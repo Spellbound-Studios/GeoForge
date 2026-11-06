@@ -125,7 +125,7 @@ namespace Spellbound.GeoForge {
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static int CaseCodeBit(in VoxelData corner, int cornerIndex) {
-            return corner.Density >= 0 ? 1 << cornerIndex : 0;
+            return VoxelEncoding.IsSolid(corner.Density) ? 1 << cornerIndex : 0;
         }
 
         /// <summary>
@@ -157,7 +157,7 @@ namespace Spellbound.GeoForge {
                         chunkDataAreaSize, chunkDataWidthSize)
                 ].Density;
 
-                var isMidPointFull = midPointDensity >= 0;
+                var isMidPointFull = VoxelEncoding.IsSolid(midPointDensity);
 
                 var isVertexNearerToVert1 =
                     (isMidPointFull && isVert0Full)
@@ -253,6 +253,11 @@ namespace Spellbound.GeoForge {
             return matched && allMature;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static byte EdgeVertexMaterial(byte fullCornerMaterial, bool bothCornersMature) {
+            return VoxelEncoding.EncodeMaterial(VoxelEncoding.MaterialIndex(fullCornerMaterial), bothCornersMature);
+        }
+
         /// <summary>
         ///     Used by MarchingCubeJob and TransitionMarchingCubeJob, identically. Skips any voxel
         ///     that isn't actually "full" (density >= 0) - the same zero split the mesher uses for the
@@ -266,12 +271,12 @@ namespace Spellbound.GeoForge {
             float baseWeight,
             ref NativeList<byte> uniqueMaterials,
             ref NativeList<float> materialWeights) {
-            if (voxel.Density < 0) return;
+            if (!VoxelEncoding.IsSolid(voxel.Density)) return;
 
             // Demodulate: material identity (0-127) only. Maturity is resolved separately via
             // ResolveMaturity, checked only against voxel0/voxel1, not this wider neighborhood.
             var matIndex = voxel.GetPlainMatIndex();
-            var densityWeight = voxel.Density / (float)sbyte.MaxValue;
+            var densityWeight = VoxelEncoding.SurfaceWeight(voxel.Density);
             var weight = baseWeight * densityWeight;
 
             var existingIndex = -1;

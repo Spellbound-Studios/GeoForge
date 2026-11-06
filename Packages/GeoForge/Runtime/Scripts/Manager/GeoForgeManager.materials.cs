@@ -50,7 +50,8 @@ namespace Spellbound.GeoForge {
                 if (dict.TryGetValue(table.DataType, out var existing)) {
                     Debug.LogError(
                         $"{nameof(GeoForgeManager)}: multiple side tables registered for type " +
-                        $"{table.DataType} - '{existing.name}' and '{table.name}'. Only '{existing.name}' will be used.",
+                        $"{table.DataType} - '{existing.name}' and '{table.name}'. " +
+                        $"Only '{existing.name}' will be used.",
                         this);
                     continue;
                 }

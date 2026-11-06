@@ -132,7 +132,8 @@ namespace Spellbound.GeoForge {
 
                     if (slot.IsArrayInUse) {
                         Debug.LogError(
-                            "GetOrUnpackVoxelArray - Trying to unpack voxel array but array is in use for the same geoChunk. This is unexpected and bad.");
+                            "GetOrUnpackVoxelArray - Trying to unpack voxel array but array is in use for the same " +
+                            "geoChunk. This is unexpected and bad.");
 
                         return slot.DenseVoxelArray;
                     }
@@ -199,7 +200,8 @@ namespace Spellbound.GeoForge {
 
                 if (slot == null) {
                     Debug.LogError(
-                        $"PackVoxelArray - Trying to pack but chunk {chunkEngine.ChunkCoord} has no resident slot (isEdit={isEdit})");
+                        $"PackVoxelArray - Trying to pack but chunk {chunkEngine.ChunkCoord} has no resident slot " +
+                        $"(isEdit={isEdit})");
 
                     return;
                 }
@@ -290,7 +292,8 @@ namespace Spellbound.GeoForge {
 
                 if (slot == null) {
                     ConsoleLogger.PrintError(
-                        $"MarchingCubes Manager does not have a denseVoxelData Array for chunk {chunkEngine.ChunkCoord} (isEdit={isEdit})");
+                        $"MarchingCubes Manager does not have a denseVoxelData Array for chunk " +
+                        $"{chunkEngine.ChunkCoord} (isEdit={isEdit})");
 
                     return;
                 }
@@ -339,8 +342,8 @@ namespace Spellbound.GeoForge {
             internal long LastAccessTick;
 
             internal DenseVoxelData(int chunkSize, Allocator allocator = Allocator.Persistent) {
-                var cs = chunkSize + 3;
-                DenseVoxelArray = new NativeArray<VoxelData>(cs * cs * cs, allocator);
+                var width = ChunkLayout.DataWidth(chunkSize);
+                DenseVoxelArray = new NativeArray<VoxelData>(width * width * width, allocator);
                 DensityRange = new NativeArray<DensityRange>(1, allocator);
                 IsArrayInUse = false;
                 CurrentChunkEngine = null;

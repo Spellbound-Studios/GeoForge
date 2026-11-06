@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
 using System.Runtime.CompilerServices;
@@ -13,8 +13,8 @@ namespace Spellbound.GeoForge {
     /// </summary>
     [Serializable]
     public struct VoxelData : IEquatable<VoxelData>, IPacker {
-        public const byte MatureBitValue = 128;
-        public const byte NullSentinelValue = 127;
+        public const byte MatureBitValue = VoxelEncoding.MatureBit;
+        public const byte NullSentinelValue = VoxelEncoding.NullMaterialIndex;
 
         public sbyte Density;
         public byte MaterialIndex;
@@ -26,22 +26,22 @@ namespace Spellbound.GeoForge {
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static VoxelData CreateImmature(sbyte density, byte matIndex) {
-            return new VoxelData(density, (byte)(matIndex % MatureBitValue));
+            return new VoxelData(density, VoxelEncoding.EncodeMaterial(matIndex, false));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static VoxelData CreateMature(sbyte density, byte matIndex) {
-            return new VoxelData(density, (byte)((matIndex % MatureBitValue) + MatureBitValue));
+            return new VoxelData(density, VoxelEncoding.EncodeMaterial(matIndex, true));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsMature() {
-            return MaterialIndex >= MatureBitValue;
+            return VoxelEncoding.IsMature(MaterialIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte GetPlainMatIndex() {
-            return (byte)(MaterialIndex % MatureBitValue);
+            return VoxelEncoding.MaterialIndex(MaterialIndex);
         }
 
         public void Pack(ref Span<byte> buffer) {

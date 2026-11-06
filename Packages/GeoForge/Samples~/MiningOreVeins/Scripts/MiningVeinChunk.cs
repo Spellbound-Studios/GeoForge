@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System.Collections.Generic;
 using UnityEngine;
@@ -36,7 +36,7 @@ namespace Spellbound.GeoForge.Sample2 {
             foreach (var voxelDelta in operation.Deltas) {
                 var voxelData = GeoChunkEngine.GetVoxelData(voxelDelta.Index);
                 var existingMatIndex = voxelData.MaterialIndex;
-                var wasFull = voxelData.Density >= 0;
+                var wasFull = VoxelEncoding.IsSolid(voxelData.Density);
 
                 // Same gate as the crossing rule elsewhere: a disallowed/Impervious voxel that's
                 // already full takes no damage at all - additions or subtractions alike.
@@ -54,7 +54,8 @@ namespace Spellbound.GeoForge.Sample2 {
                 _damagedVoxels[voxelDelta.Index] = totalDamage;
 
                 if (totalDamage >= oreHealth) {
-                    trueEdits.Add((voxelDelta.Index, VoxelData.CreateImmature(sbyte.MinValue, VoxelData.NullSentinelValue)));
+                    trueEdits.Add((voxelDelta.Index,
+                        VoxelData.CreateImmature(sbyte.MinValue, VoxelData.NullSentinelValue)));
                     _damagedVoxels.Remove(voxelDelta.Index); // reset in case this voxel is later refilled
                 }
             }

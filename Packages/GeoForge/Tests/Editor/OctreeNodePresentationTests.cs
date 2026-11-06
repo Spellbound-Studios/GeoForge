@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
-using Spellbound.Core.Tooling;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -21,18 +20,13 @@ namespace Spellbound.GeoForge.Tests {
         private GeoChunkDouble _chunk;
         private Transform _chunkTransform;
         private BlobAssetReference<VolumeConfigBlobAsset> _configBlob;
-        private bool _hadManager;
         private GeoForgeManager _manager;
-        private GeoForgeManager _previousManager;
         private RecordingChunkPresenter _presenter;
         private GeoVolumeDouble _volume;
 
         [SetUp]
         public void SetUp() {
-            _hadManager = SingletonManager.TryGetSingletonInstance(out _previousManager);
-
             _manager = Track(new GameObject("GeoForge Manager")).AddComponent<GeoForgeManager>();
-            SingletonManager.RegisterSingleton(_manager);
             _presenter = new RecordingChunkPresenter();
             _manager.Presenter = _presenter;
 
@@ -48,6 +42,7 @@ namespace Spellbound.GeoForge.Tests {
             volumeObject.transform.position = new Vector3(3f, -2f, 5f);
             _volume = volumeObject.AddComponent<GeoVolumeDouble>();
             _volume.ConfigBlob = _configBlob;
+            _volume.GeoVolumeEngine = new GeoVolumeEngine(_volume, _volume, config, _manager);
 
             _chunkTransform = new GameObject("Chunk").transform;
             _chunkTransform.SetParent(volumeObject.transform, false);
@@ -64,6 +59,8 @@ namespace Spellbound.GeoForge.Tests {
             _manager.RentTriangleBuffer().Dispose();
             _manager.RentBoundsBuffer().Dispose();
 
+            _volume.GeoVolumeEngine.Dispose();
+
             if (_configBlob.IsCreated)
                 _configBlob.Dispose();
 
@@ -73,11 +70,6 @@ namespace Spellbound.GeoForge.Tests {
             }
 
             _created.Clear();
-
-            if (_hadManager)
-                SingletonManager.RegisterSingleton(_previousManager);
-            else
-                SingletonManager.UnregisterSingleton<GeoForgeManager>();
         }
 
         [Test]
@@ -235,6 +227,7 @@ namespace Spellbound.GeoForge.Tests {
         [Test]
         public void WithoutAPresenterMarchResultsAreDiscardedAndEmptyAddressesAreStillRecorded() {
             _manager.Presenter = null;
+            _manager.CollisionPresenter = null;
             var node = CreateNode();
 
             ApplyTriangle(node);
@@ -264,7 +257,8 @@ namespace Spellbound.GeoForge.Tests {
         }
 
         private void Validate(OctreeNode node) {
-            node.ValidateOctreeLods(Vector3.zero, default);
+            node.ValidateOctreeLods(new[] { new ChunkViewer(Vector3.zero, 0f, 0f) }, new DistanceChunkInterest(),
+                default);
             _manager.CompleteAndApplyMarchingCubesJobs();
         }
 

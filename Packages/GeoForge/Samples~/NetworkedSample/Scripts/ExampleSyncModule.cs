@@ -1,4 +1,4 @@
-﻿// Copyright 2026 Spellbound Studio Inc.
+﻿// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -135,8 +135,8 @@ namespace Spellbound.GeoForge.Sample4 {
         }
 
         /// <summary>
-        /// Authority driven ServerRpc that forces server to sync a batch and then distribute to observers. This ServerRpc
-        /// can only be called by the owner of this module.
+        /// Authority driven ServerRpc that forces server to sync a batch and then distribute to observers. This
+        /// ServerRpc can only be called by the owner of this module.
         /// </summary>
         [ServerRpc(requireOwnership: true)]
         private void AuthorityDrivenSendBatchToServerRpc(byte[] payload) {
@@ -256,7 +256,7 @@ namespace Spellbound.GeoForge.Sample4 {
                 if (!_chunkData.TryReadEdit(voxelDelta.Index, out var voxelData))
                     voxelData = geoChunkEngine.GetVoxelData(voxelDelta.Index);
 
-                var wasFull = voxelData.Density >= 0;
+                var wasFull = VoxelEncoding.IsSolid(voxelData.Density);
                 var existingMatIndex = voxelData.GetPlainMatIndex();
 
                 // Gate: a voxel that's already full and whose current material this operation
@@ -271,7 +271,7 @@ namespace Spellbound.GeoForge.Sample4 {
                     sbyte.MinValue,
                     sbyte.MaxValue);
 
-                var isFull = density >= 0;
+                var isFull = VoxelEncoding.IsSolid(density);
 
                 byte matIndex;
                 VoxelData resolved;

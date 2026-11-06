@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4407416699791479052}
   - component: {fileID: 9083058433317415293}
+  - component: {fileID: 4718302265981530017}
   m_Layer: 0
   m_Name: SimpleVolume
   m_TagString: Untagged
@@ -55,3 +56,18 @@ MonoBehaviour:
   - {x: 143.2, y: 271.2}
   - {x: 271.2, y: 527.2}
   <ChunkPrefab>k__BackingField: {fileID: 4065535263056542906, guid: 4af8e799ce530654588b63eb3c2a9d0d, type: 3}
+--- !u!114 &4718302265981530017
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3696227468701064333}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ba4109ed08f2794fb55fca1de7aeed1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  viewpoint: {fileID: 0}
+  collisionRadius: 0
+  detailRadius: 0

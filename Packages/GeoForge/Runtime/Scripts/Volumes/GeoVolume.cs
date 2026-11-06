@@ -1,6 +1,7 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using System.Collections;
+using Spellbound.Core.Logging;
 using UnityEngine;
 
 namespace Spellbound.GeoForge {
@@ -9,10 +10,14 @@ namespace Spellbound.GeoForge {
     ///     Initializes Chunks one per frame until all are initialized.
     ///     All other management is the baseline wrappers for GeoVolume.
     ///     Note IGeoVolume implementations are NOT virtual. The intent of GeoVolume is to be extendable,
-    ///     but not in terms of altering it how it implements IGeoVolume. If you want a unique implementation of IGeoVolume,
-    ///     create a new class instead of inheriting from GeoVolume.
+    ///     but not in terms of altering it how it implements IGeoVolume. If you want a unique implementation of
+    ///     IGeoVolume, create a new class instead of inheriting from GeoVolume.
     /// </summary>
     public class GeoVolume : MonoBehaviour, IGeoVolume {
+        [Tooltip("The manager this volume belongs to. If left unset, the manager on a parent is used.")]
+        [SerializeField]
+        private GeoForgeManager manager;
+
         [field: Tooltip("Preset for what voxel data is generated in the geoVolume")]
         [field: SerializeField]
         protected GeoForgeDataGenerator DataGenerator { get; set; }
@@ -30,13 +35,7 @@ namespace Spellbound.GeoForge {
         [field: SerializeField]
         private GameObject ChunkPrefab { get; set; }
 
-        [field: Tooltip("Optional explicit LOD target (e.g. the player camera). If left unset, falls back " +
-                        "to Camera.main, then any Camera found in the scene. Resolved once and cached on " +
-                        "first access - not re-evaluated per call.")]
-        [field: SerializeField]
-        private Transform LodTargetOverride { get; set; }
-
-        private Transform _resolvedLodTarget;
+        private IDensitySource _pendingDensitySource;
 
         /// <summary>
         ///     Chunk Prefab must have a IGeoChunk component.
@@ -55,8 +54,8 @@ namespace Spellbound.GeoForge {
 
         /// <summary>
         ///     Marching Cubes meshes utilize a triplanar shader. In order for textures to "stick to" their gemometry
-        ///     as the geoVolume moves, the geoVolume origin must be updated. This is costly so should be avoided for volumes
-        ///     that reliably will not move.
+        ///     as the geoVolume moves, the geoVolume origin must be updated. This is costly so should be avoided for
+        ///     volumes that reliably will not move.
         /// </summary>
         protected virtual void Update() {
             if (!IsMoving)
@@ -104,6 +103,19 @@ namespace Spellbound.GeoForge {
 
         public GeoVolumeEngine GeoVolumeEngine { get; private set; }
 
+        public IDensitySource DensitySource =>
+            GeoVolumeEngine != null ? GeoVolumeEngine.DensitySource : _pendingDensitySource;
+
+        public void UseDensitySource(IDensitySource source) {
+            if (GeoVolumeEngine == null) {
+                _pendingDensitySource = source;
+
+                return;
+            }
+
+            GeoVolumeEngine.UseDensitySource(source);
+        }
+
         public void ResetEditedChunksToProcedural() {
             if (GeoVolumeEngine == null)
                 return;
@@ -117,46 +129,24 @@ namespace Spellbound.GeoForge {
 
         public Transform VolumeTransform => transform;
 
-        /// <summary>
-        ///     Resolved once (lodTargetOverride, then Camera.main, then any Camera in the scene) and
-        ///     cached - no repeated scene search per call, and no NullReferenceException if nothing
-        ///     resolves (returns null and logs instead). Once resolved, later calls return the cached
-        ///     Transform directly regardless of any changes to Camera.main afterward.
-        /// </summary>
-        public Transform LodTarget {
-            get {
-                if (_resolvedLodTarget != null)
-                    return _resolvedLodTarget;
-
-                if (LodTargetOverride != null) {
-                    _resolvedLodTarget = LodTargetOverride;
-
-                    return _resolvedLodTarget;
-                }
-
-                if (Camera.main != null) {
-                    _resolvedLodTarget = Camera.main.transform;
-
-                    return _resolvedLodTarget;
-                }
-
-                var fallbackCamera = FindAnyObjectByType<Camera>();
-
-                if (fallbackCamera != null) {
-                    _resolvedLodTarget = fallbackCamera.transform;
-
-                    return _resolvedLodTarget;
-                }
-
-                Debug.LogError(
-                    $"{name}: LodTarget could not resolve - no lodTargetOverride assigned and no Camera found in the scene.");
-
-                return null;
-            }
-        }
-
         protected virtual void CreateGeoVolume(VoxelVolumeConfig voxelVolumeConfig) {
-            GeoVolumeEngine = new GeoVolumeEngine(this, this, voxelVolumeConfig);
+            var volumeManager = manager != null ? manager : GetComponentInParent<GeoForgeManager>();
+
+            if (volumeManager == null) {
+                Log.Error($"{name}: no {nameof(GeoForgeManager)} is assigned or on a parent, so nothing is built.",
+                    this);
+                enabled = false;
+
+                return;
+            }
+
+            GeoVolumeEngine = new GeoVolumeEngine(this, this, voxelVolumeConfig, volumeManager);
+
+            if (_pendingDensitySource != null) {
+                GeoVolumeEngine.UseDensitySource(_pendingDensitySource);
+                _pendingDensitySource = null;
+            }
+
             GeoVolumeEngine.RegisterVolume();
             OnVolumeRegistered();
             StartCoroutine(InitializeChunks());
@@ -190,7 +180,8 @@ namespace Spellbound.GeoForge {
                 }
 
                 chunk.SetBoundaryOverrides(chunkCoord, GeoVolumeEngine.ConfigBlob, BoundaryOverrides);
-                chunk.SetVoxels(chunkCoord, GeoVolumeEngine.ConfigBlob, DataGenerator);
+                chunk.SetVoxels(GeoVolumeEngine.CreateFillRequest(chunkCoord),
+                    GeoVolumeEngine.DensitySourceFor(DataGenerator));
 
                 yield return null;
             }

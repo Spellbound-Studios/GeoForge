@@ -1,4 +1,4 @@
-// Copyright 2026 Spellbound Studio Inc.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
 using Unity.Collections;
 using Unity.Entities;
@@ -19,78 +19,12 @@ namespace Spellbound.GeoForge {
             var builder = new BlobBuilder(Allocator.Temp);
             ref var chunkInterpolations = ref builder.ConstructRoot<McChunkInterpolationBlobAsset>();
 
-            var weightArray = builder.Allocate(ref chunkInterpolations.ChunkCornerWeights,
-                (chunkSize + 3) * (chunkSize + 3));
+            var width = ChunkLayout.DataWidth(chunkSize);
+            var weightArray = builder.Allocate(ref chunkInterpolations.ChunkCornerWeights, width * width);
+            using var weights = ChunkLayout.CornerWeights(chunkSize, Allocator.Temp);
 
-            var innerMin = 1;
-            var innerMax = chunkSize + 1;
-            var innerSize = innerMax - innerMin;
-
-            for (var i = 0; i < weightArray.Length; i++) {
-                GfStaticHelper.IndexToInt2(i, chunkSize + 3, out var x, out var z);
-                var weights = float4.zero;
-
-                // 🟩 CASE 1: Corners (exact match to CornerPositions)
-                if (x == innerMin && z == innerMin) {
-                    weights.x = 1f; // corner 0
-                }
-                else if (x == innerMin && z == innerMax) {
-                    weights.y = 1f; // corner 1
-                }
-                else if (x == innerMax && z == innerMin) {
-                    weights.z = 1f; // corner 2
-                }
-                else if (x == innerMax && z == innerMax) {
-                    weights.w = 1f; // corner 3
-                }
-
-                // 🟨 CASE 2: Edges (interpolate linearly between 2 adjacent corners)
-                else if (x == innerMin) {
-                    var v = (float)(z - innerMin) / innerSize;
-                    v = math.smoothstep(0f, 1f, v);
-                    weights.x = 1f - v; // top-left
-                    weights.y = v; // bottom-left
-                }
-                else if (x == innerMax) {
-                    var v = (float)(z - innerMin) / innerSize;
-                    v = math.smoothstep(0f, 1f, v);
-                    weights.z = 1f - v; // top-right
-                    weights.w = v; // bottom-right
-                }
-                else if (z == innerMin) {
-                    var u = (float)(x - innerMin) / innerSize;
-                    u = math.smoothstep(0f, 1f, u);
-                    weights.x = 1f - u; // top-left
-                    weights.z = u; // top-right
-                }
-                else if (z == innerMax) {
-                    var u = (float)(x - innerMin) / innerSize;
-                    u = math.smoothstep(0f, 1f, u);
-                    weights.y = 1f - u; // bottom-left
-                    weights.w = u; // bottom-right
-                }
-
-                // 🟦 CASE 3: Interior → full bilinear interpolation
-                else {
-                    var u = (float)(x - innerMin) / innerSize;
-                    var v = (float)(z - innerMin) / innerSize;
-
-                    u = math.smoothstep(0f, 1f, u);
-                    v = math.smoothstep(0f, 1f, v);
-
-                    weights = new float4(
-                        (1f - u) * (1f - v), // top-left (corner 0)
-                        (1f - u) * v, // bottom-left (corner 1)
-                        u * (1f - v), // top-right (corner 2)
-                        u * v // bottom-right (corner 3)
-                    );
-                }
-
-                var sum = math.csum(weights);
-                weights /= sum;
-
-                weightArray[i] = weights;
-            }
+            for (var i = 0; i < weightArray.Length; i++)
+                weightArray[i] = weights[i];
 
             var result = builder.CreateBlobAssetReference<McChunkInterpolationBlobAsset>(Allocator.Persistent);
             builder.Dispose();
