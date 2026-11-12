@@ -1,0 +1,42 @@
+{
+  "name": "Spellbound.GeoForge.Networking.PurrNet.Tests",
+  "rootNamespace": "Spellbound.GeoForge.Networking.Tests",
+  "references": [
+    "Spellbound.GeoForge",
+    "Spellbound.GeoForge.Networking",
+    "Spellbound.Networking",
+    "Spellbound.Networking.Replication",
+    "Spellbound.Core",
+    "PurrNet.Runtime",
+    "Unity.Collections",
+    "Unity.Entities",
+    "Unity.Mathematics",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "SPELLBOUND_NETWORKING", "SPELLBOUND_CORE", "PURRNET"],
+  "versionDefines": [
+    {
+      "name": "com.spellboundstudios.core",
+      "expression": "[1.1.9,3.0.0)",
+      "define": "SPELLBOUND_CORE"
+    },
+    {
+      "name": "com.spellboundstudios.networking",
+      "expression": "[0.0.0,2.0.0)",
+      "define": "SPELLBOUND_NETWORKING"
+    },
+    {
+      "name": "dev.purrnet.purrnet",
+      "expression": "[1.25.0-beta.1,2.0.0)",
+      "define": "PURRNET"
+    }
+  ],
+  "noEngineReferences": false
+}

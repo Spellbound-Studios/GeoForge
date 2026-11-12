@@ -1,0 +1,25 @@
+{
+  "name": "Spellbound.GeoForge.Networking",
+  "rootNamespace": "Spellbound.GeoForge.Networking",
+  "references": ["Spellbound.GeoForge", "Spellbound.Networking.Replication", "Spellbound.Core"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": ["SPELLBOUND_NETWORKING", "SPELLBOUND_CORE"],
+  "versionDefines": [
+    {
+      "name": "com.spellboundstudios.core",
+      "expression": "[1.1.9,3.0.0)",
+      "define": "SPELLBOUND_CORE"
+    },
+    {
+      "name": "com.spellboundstudios.networking",
+      "expression": "[0.0.0,2.0.0)",
+      "define": "SPELLBOUND_NETWORKING"
+    }
+  ],
+  "noEngineReferences": false
+}

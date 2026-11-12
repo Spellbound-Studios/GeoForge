@@ -28,5 +28,14 @@ namespace Spellbound.GeoForge {
         }
 
         void Clear();
+
+        int CopyEdits(List<(int, VoxelData)> edits) {
+            edits.Clear();
+
+            foreach (var edit in ReadAllEdits())
+                edits.Add(edit);
+
+            return edits.Count;
+        }
     }
 }

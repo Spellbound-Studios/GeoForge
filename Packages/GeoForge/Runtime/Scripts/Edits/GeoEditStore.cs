@@ -110,6 +110,15 @@ namespace Spellbound.GeoForge {
                 yield return (idx, voxelData);
         }
 
+        public int CopyEdits(List<(int, VoxelData)> edits) {
+            edits.Clear();
+
+            foreach (var edit in _chunkData.Edits)
+                edits.Add((edit.Key, edit.Value));
+
+            return edits.Count;
+        }
+
         public void Clear() {
             _chunkData.ClearEdits();
         }

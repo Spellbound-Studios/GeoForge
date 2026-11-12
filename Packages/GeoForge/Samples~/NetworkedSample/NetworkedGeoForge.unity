@@ -332,6 +332,17 @@ MonoBehaviour:
   playerCollider: {fileID: 0}
   freezeUpdate: 0
   uiPrefab: {fileID: 1888963776233452812, guid: fc6c9001bf2d5444683da49ab4441134, type: 3}
+--- !u!114 &408606929 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6673862094514295435, guid: 649071cd54a327946a92f1cedecd78e2, type: 3}
+  m_PrefabInstance: {fileID: 1019270029}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e236c09a8a93ae419d10d8c20914a0f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -597,7 +608,6 @@ GameObject:
   m_Component:
   - component: {fileID: 963978344}
   - component: {fileID: 963978343}
-  - component: {fileID: 963978346}
   - component: {fileID: 963978347}
   - component: {fileID: 963978348}
   m_Layer: 0
@@ -620,17 +630,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.NetworkManager
   _stopPlayingOnDisconnect: 0
-  _startServerFlags: 0
-  _startClientFlags: 0
+  _startServerFlags: 9
+  _startClientFlags: 7
   _cookieScope: 1
   _dontDestroyOnLoad: 1
-  _transport: {fileID: 963978346}
+  _transport: {fileID: 963978348}
   _networkPrefabs: {fileID: 11400000, guid: 8047d85540db97a48bf757c25b19b391, type: 2}
   _networkAssets: {fileID: 0}
-  _networkRules: {fileID: 11400000, guid: 6abc5ff662b58e84a9b1ed84a5a72ccd, type: 2}
+  _networkRules: {fileID: 11400000, guid: b8a6ca31e7fde4844a4b23610915f423, type: 2}
   _visibilityRules: {fileID: 11400000, guid: 8f014a5bd8dc68646a2a3c0b18c5bbd8, type: 2}
   _authenticator: {fileID: 0}
   _tickRate: 20
+  _maxTicksPerFrame: 5
+  _mtuExceededBehaviour: 2
   _patchLingeringProcessBug: 0
 --- !u!4 &963978344
 Transform:
@@ -647,24 +659,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &963978346
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 963978341}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 332e746c3c3253246aacad4d5559f1fb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.Transports.PurrTransport
-  _masterServer: https://purrtransport.purrservers.com/
-  _roomName: 80b88d00f92b46d6abdbcbaa0de3014b
-  _region: nj-us
-  _host: purrtransport-nj-us.purrservers.com
-  _timeoutInSeconds: 5
-  _pollEventsInUpdate: 0
 --- !u!114 &963978347
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -683,6 +677,14 @@ MonoBehaviour:
   _displayTarget: 6
   fontSize: 13
   textColor: {r: 0, g: 0, b: 0, a: 1}
+  _highPingThreshold: 250
+  _highPingRecoveryThreshold: 180
+  _highJitterThreshold: 80
+  _highJitterRecoveryThreshold: 50
+  _highPacketLossThreshold: 10
+  _highPacketLossRecoveryThreshold: 5
+  _qualityChangeDuration: 2
+  _connectionStallThreshold: 2
 --- !u!114 &963978348
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -692,9 +694,23 @@ MonoBehaviour:
   m_GameObject: {fileID: 963978341}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e5c476fd9733ed148b4631bd99c76108, type: 3}
+  m_Script: {fileID: 11500000, guid: fc64ff707d914a64e95f2ac0bf554c09, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.Transports.UDPTransport
+  _automaticCloudSetups:
+    _adaptToEdgegap: 1
+  _serverPort: 5000
+  _maxConnections: 100
+  _address: 127.0.0.1
+  _timeoutInSeconds: 5
+  _useNativeSockets: 1
+  _networkSimulation:
+    includeInBuild: 0
+    simulateLatency: 0
+    minLatency: 30
+    maxLatency: 100
+    simulatePacketLoss: 0
+    packetLossChance: 10
 --- !u!1001 &1019270029
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -915,6 +931,53 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1115042937}
   m_CullTransparentMesh: 1
+--- !u!1 &1699915689
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1699915691}
+  - component: {fileID: 1699915690}
+  m_Layer: 0
+  m_Name: Player Spawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1699915690
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1699915689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ced7bf28cdbee104e8cdc34ab761b039, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.PlayerSpawner
+  _playerPrefab: {fileID: 1655592441434212725, guid: ef550fbc9d2dc714ca70cb8f82072821, type: 3}
+  _ignoreNetworkRules: 0
+  spawnPoints: []
+--- !u!4 &1699915691
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1699915689}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2019303965
 GameObject:
   m_ObjectHideFlags: 0
@@ -1143,61 +1206,21 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: config
+      propertyPath: manager
       value: 
-      objectReference: {fileID: 11400000, guid: 79155a67764bc2c488cd2d6cc669bb79, type: 2}
+      objectReference: {fileID: 408606929}
     - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: dataFactory
+      propertyPath: networkManager
       value: 
-      objectReference: {fileID: 11400000, guid: 595aa38bbf477964f91f812c0426695e, type: 2}
+      objectReference: {fileID: 963978343}
     - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: isPrimaryTerrain
+      propertyPath: <IsPrimaryTerrain>k__BackingField
       value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: boundaryOverrides
-      value: 
-      objectReference: {fileID: 11400000, guid: 4f43f851bbe38eb47ab25e7b9ff01110, type: 2}
-    - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: viewDistanceLodRanges.Array.size
-      value: 4
-      objectReference: {fileID: 0}
-    - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: viewDistanceLodRanges.Array.data[0].y
-      value: 70.02
-      objectReference: {fileID: 0}
-    - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: viewDistanceLodRanges.Array.data[1].x
-      value: 70.02
-      objectReference: {fileID: 0}
-    - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: viewDistanceLodRanges.Array.data[1].y
-      value: 134.01999
-      objectReference: {fileID: 0}
-    - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: viewDistanceLodRanges.Array.data[2].x
-      value: 134.01999
-      objectReference: {fileID: 0}
-    - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: viewDistanceLodRanges.Array.data[2].y
-      value: 262.02
-      objectReference: {fileID: 0}
-    - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: viewDistanceLodRanges.Array.data[3].x
-      value: 262.02
-      objectReference: {fileID: 0}
-    - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: viewDistanceLodRanges.Array.data[3].y
-      value: 518.02
       objectReference: {fileID: 0}
     - target: {fileID: 3585596676457186269, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
       propertyPath: m_Name
       value: MyVolume
       objectReference: {fileID: 0}
-    - target: {fileID: 1732448111443529495, guid: 6928b862ff83cef4ea5ec608012efb29, type: 3}
-      propertyPath: manager
-      value: 
-      objectReference: {fileID: 408606929}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1238,14 +1261,4 @@ SceneRoots:
   - {fileID: 2027800327}
   - {fileID: 677270794}
   - {fileID: 8034012780221763941}
---- !u!114 &408606929 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 6673862094514295435, guid: 649071cd54a327946a92f1cedecd78e2, type: 3}
-  m_PrefabInstance: {fileID: 1019270029}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0e236c09a8a93ae419d10d8c20914a0f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  - {fileID: 1699915691}

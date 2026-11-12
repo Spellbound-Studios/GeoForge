@@ -1,141 +1,165 @@
-﻿// Copyright (c) Spellbound Studios. All rights reserved.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
-using System;
-using System.Collections;
+using System.Collections.Generic;
 using PurrNet;
+using PurrNet.Transports;
+using Spellbound.Core;
 using Spellbound.Core.Logging;
-using Spellbound.GeoForge;
-using Spellbound.GeoForge.Sample4;
+using Spellbound.Core.Observations;
+using Spellbound.Core.Simulation;
+using Spellbound.Core.Viewers;
+using Spellbound.GeoForge.Networking;
+using Spellbound.Networking;
+using Spellbound.Networking.Replication;
 using UnityEngine;
 
-namespace GeoForge.Sample4 {
-    public class NetworkedVolume : NetworkIdentity, IGeoVolume {
-        [Header("Volume Settings"), Tooltip("Config for ChunkSize, VolumeSize, etc"), SerializeField]
-        protected VoxelVolumeConfig config;
+namespace Spellbound.GeoForge.Sample4 {
+    public class NetworkedVolume : GeoVolume {
+        [Tooltip("The network manager this volume's edits replicate through. Left empty, the volume edits locally.")]
+        [SerializeField]
+        private NetworkManager networkManager;
 
-        [Tooltip("Initial State for if the volume is moving. " +
-                 "If true it updates the origin of the triplanar material shader"), SerializeField]
-        protected bool isMoving;
+        [Tooltip("The replication settings of this volume's world, with the layer its edits travel on.")]
+        [SerializeField]
+        private ReplicationSettings replicationSettings;
 
-        [Tooltip("Initial State for if the volume is the Primary Terrain. " +
-                 "Affects whether it can be globally queried or not"), SerializeField]
-        protected bool isPrimaryTerrain;
+        [Tooltip("The index of the layer in the replication settings that carries the voxel edits.")]
+        [SerializeField]
+        private int editLayer;
 
-        [Tooltip("View Distances to each Level of Detail. Enforces a floor to prohibit abrupt changes"), SerializeField]
-        protected Vector2[] viewDistanceLodRanges;
+        [Tooltip("The index of this volume's world on the network manager, unique per manager.")]
+        [SerializeField]
+        private byte worldIndex = 1;
 
-        [Tooltip("Prefab for the Chunk the Volume will build itself from. Must Implement IChunk"), SerializeField]
-        private GameObject chunkPrefab;
+        [Tooltip("The id every region's voxel edit source carries; equal on every peer.")]
+        [SerializeField]
+        private uint editSourceId = 1;
 
-        [Tooltip("The manager this volume belongs to"), SerializeField]
-        private GeoForgeManager manager;
+        [Tooltip("The fingerprint of the procedural terrain the edits apply over; equal on every peer.")]
+        [SerializeField]
+        private ulong terrainFingerprint = 1;
 
-        private GeoVolumeEngine _geoVolumeEngine;
+        [Tooltip("The collision radius of a player's viewer, in metres.")]
+        [SerializeField]
+        private float viewerCollisionRadius = 1f;
 
-        public GeoVolumeEngine GeoVolumeEngine => _geoVolumeEngine;
+        [Tooltip("The detail radius of a player's viewer, in metres.")]
+        [SerializeField]
+        private float viewerDetailRadius = 1f;
 
-#if UNITY_EDITOR
-        /// <summary>
-        /// Enforces a floor on view distances to prohibit abrupt changes.
-        /// The TransVoxel Algorithm does not handle abrupt changes so they would leave visible seams.
-        /// </summary>
-        protected virtual void OnValidate() {
-            if (config == null) {
-                viewDistanceLodRanges = null;
+        private readonly Dictionary<Transform, ViewerId> _viewpoints = new();
+        private ObservationContext _observations;
+        private TickClock _clock;
+        private bool _listening;
+
+        public VoxelEditStores VoxelEditStores { get; private set; }
+
+        public WorldNetworking Networking { get; private set; }
+
+        protected override void Awake() {
+            _observations = CoreKit.Observations.CreateContext("geoforge_networked_volume_" + GetInstanceID());
+            var settings = new VoxelEditSourceSettings(terrainFingerprint, editSourceId, null, 0, EditCellSize());
+            VoxelEditStores = GeoForgeNetworkingKit.CreateEditStores(this, settings, _observations);
+            UseEditStores(VoxelEditStores);
+            base.Awake();
+        }
+
+        protected virtual void Start() {
+            if (networkManager == null)
+                return;
+
+            if (replicationSettings == null) {
+                Log.Error($"{name}: no {nameof(ReplicationSettings)} is assigned, so its edits stay local.", this);
 
                 return;
             }
 
-            viewDistanceLodRanges = GeoVolumeEngine.ValidateLodRanges(viewDistanceLodRanges, config);
-        }
-#endif
+            var rate = TickRate.PerSecond(networkManager.tickRate);
+            _clock = CoreKit.Time.StartClock(rate, _observations);
+            var services = new WorldNetworkingServices {
+                Clock = _clock,
+                Ledger = CoreKit.Intents.CreateLedger(rate, _observations),
+                Viewers = new ViewerRegistry(),
+                Binder = new VoxelRegionBinder(VoxelEditStores),
+                Scene = gameObject.scene,
+                WorldIndex = worldIndex
+            };
+            Networking = NetworkingPurrNetKit.CreateWorldNetworking(replicationSettings, networkManager, in services,
+                _observations);
 
-        /// <summary>
-        /// Chunk Prefab must have a IChunk component.
-        /// All IVolumes should create VoxelCoreLogic on Awake.
-        /// </summary>
-        protected override void OnEarlySpawn() {
-            if (chunkPrefab == null || !chunkPrefab.TryGetComponent<IGeoChunk>(out _)) {
-                Debug.LogError($"{name}: _chunkPrefab is null or does not have IChunk Component", this);
-
+            if (Networking == null)
                 return;
+
+            networkManager.onServerConnectionState += OnConnectionState;
+            networkManager.onClientConnectionState += OnConnectionState;
+            _listening = true;
+        }
+
+        protected override void Update() {
+            base.Update();
+
+            if (Networking == null)
+                return;
+
+            var viewers = Networking.Services.Viewers;
+
+            foreach (var viewpoint in _viewpoints)
+                viewers.Move(viewpoint.Value, viewpoint.Key.position);
+        }
+
+        protected override void OnDestroy() {
+            StopNetworking();
+            base.OnDestroy();
+            VoxelEditStores?.Dispose();
+            _observations?.Dispose();
+        }
+
+        public bool TrackPlayer(PlayerID player, Transform viewpoint) {
+            if (Networking == null || viewpoint == null || _viewpoints.ContainsKey(viewpoint) ||
+                !Networking.Participants.Contains(player))
+                return false;
+
+            var viewer = Networking.Services.Viewers.Add(viewpoint.position, viewerCollisionRadius,
+                viewerDetailRadius);
+            Networking.Streamer.Track(viewer, Networking.Participants.Of(player));
+            _viewpoints.Add(viewpoint, viewer);
+
+            return true;
+        }
+
+        public void ForgetPlayer(Transform viewpoint) {
+            if (viewpoint == null || !_viewpoints.Remove(viewpoint, out var viewer) || Networking == null)
+                return;
+
+            Networking.Streamer.Forget(viewer);
+            Networking.Services.Viewers.Remove(viewer);
+        }
+
+        private void OnConnectionState(ConnectionState state) {
+            if (state == ConnectionState.Disconnecting || state == ConnectionState.Disconnected)
+                StopNetworking();
+        }
+
+        private void StopNetworking() {
+            if (_listening && networkManager != null) {
+                networkManager.onServerConnectionState -= OnConnectionState;
+                networkManager.onClientConnectionState -= OnConnectionState;
             }
 
-            if (manager == null) {
-                Log.Error($"{name}: no {nameof(GeoForgeManager)} is assigned, so nothing is built.", this);
-
-                return;
-            }
-
-            _geoVolumeEngine = new GeoVolumeEngine(this, this, config, manager);
+            _listening = false;
+            _viewpoints.Clear();
+            Networking?.Dispose();
+            Networking = null;
+            CoreKit.Time.StopClock(_clock);
+            _clock = null;
         }
 
-        protected override void OnSpawned(bool asServer) {
-            Debug.Log("NetworkedVolume.Spawned");
-            GeoVolumeEngine.RegisterVolume();
-            
-            if (!isServer)
-                return;
-            
-            InitializeVolume();
-        }
+        private float EditCellSize() {
+            if (replicationSettings == null || replicationSettings.layers == null || editLayer < 0 ||
+                editLayer >= replicationSettings.layers.Count)
+                return 0f;
 
-        public virtual void InitializeVolume() {
-            StartCoroutine(InitializeChunks());
-        }
-
-        /// <summary>
-        /// Initializes Chunks one per frame, centered on the Volume's transform
-        /// One NativeArray of Voxels is maintained for all the chunks and simply overriden with new data.
-        /// </summary>
-        protected virtual IEnumerator InitializeChunks() {
-            var size = _geoVolumeEngine.ConfigBlob.Value.SizeInChunks;
-            var offset = new Vector3Int(size.x / 2, size.y / 2, size.z / 2);
-            for (var x = 0; x < size.x; x++) {
-                for (var y = 0; y < size.y; y++) {
-                    for (var z = 0; z < size.z; z++) {
-                        var chunkCoord = new Vector3Int(x, y, z) - offset;
-                        _geoVolumeEngine.CreateChunk<IGeoChunk, IGeoEditStore>(chunkCoord, chunkPrefab,
-                            new ExampleSyncModule());
-                        yield return null;
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Marching Cubes meshes utilize a triplanar shader. In order for textures to "stick to" their gemometry
-        /// as the volume moves, the volume origin must be updated. This is costly so should be avoided for volumes
-        /// that reliably will not move.
-        /// </summary>
-        protected virtual void Update() {
-            if (!isMoving)
-                return;
-
-            _geoVolumeEngine.UpdateVolumeOrigin();
-        }
-
-        /// <summary>
-        /// GeoVolume implements IDisposable to dispose it's BlobAssets. 
-        /// </summary>
-        protected override void OnDestroy() => _geoVolumeEngine?.Dispose();
-
-        // IGeoVolume implementations
-        public Vector2[] ViewDistanceLodRanges => viewDistanceLodRanges;
-
-        public Transform VolumeTransform => transform;
-        public void ResetEditedChunksToProcedural() {
-            
-        }
-
-        public bool IsMoving {
-            get => isMoving;
-            set => isMoving = value;
-        }
-
-        public bool IsPrimaryTerrain {
-            get => isPrimaryTerrain;
-            set => isPrimaryTerrain = value;
+            return replicationSettings.layers[editLayer].cellSize;
         }
     }
 }

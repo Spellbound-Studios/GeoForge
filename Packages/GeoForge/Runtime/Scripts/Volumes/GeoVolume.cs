@@ -1,5 +1,6 @@
 // Copyright (c) Spellbound Studios. All rights reserved.
 
+using System;
 using System.Collections;
 using Spellbound.Core.Logging;
 using UnityEngine;
@@ -36,6 +37,7 @@ namespace Spellbound.GeoForge {
         private GameObject ChunkPrefab { get; set; }
 
         private IDensitySource _pendingDensitySource;
+        private IGeoEditStoreSource _editStores = new GeoEditStoreSource();
 
         /// <summary>
         ///     Chunk Prefab must have a IGeoChunk component.
@@ -116,11 +118,33 @@ namespace Spellbound.GeoForge {
             GeoVolumeEngine.UseDensitySource(source);
         }
 
+        public void UseEditStores(IGeoEditStoreSource source) {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+
+            if (GeoVolumeEngine != null && GeoVolumeEngine.ChunkDict.Count > 0) {
+                Log.Error($"{name}: edit stores are given before the first chunk is made; " +
+                          $"{GeoVolumeEngine.ChunkDict.Count} chunks already hold theirs, so the source is refused.",
+                    this);
+
+                return;
+            }
+
+            _editStores = source;
+        }
+
+        public IGeoEditStoreSource EditStores => _editStores;
+
+        public void ForgetEditStores(IGeoEditStoreSource source) {
+            if (source != null && ReferenceEquals(_editStores, source))
+                _editStores = new GeoEditStoreSource();
+        }
+
         public void ResetEditedChunksToProcedural() {
-            if (GeoVolumeEngine == null)
+            if (GeoVolumeEngine != null && !GeoVolumeEngine.TryResetEditedChunksToProcedural(DataGenerator))
                 return;
 
-            GeoVolumeEngine.ResetEditedChunksToProcedural(DataGenerator);
+            _editStores.ClearStores();
         }
 
         void IGeoVolume.HandleAllChunksMeshed() {
@@ -167,8 +191,8 @@ namespace Spellbound.GeoForge {
             for (var y = 0; y < size.y; y++)
             for (var z = 0; z < size.z; z++) {
                 var chunkCoord = new Vector3Int(x, y, z) - offset;
-                var chunk = GeoVolumeEngine.CreateChunk<IGeoChunk, GeoEditStore>(chunkCoord, ChunkPrefab,
-                    new GeoEditStore());
+                var chunk = GeoVolumeEngine.CreateChunk<IGeoChunk, IGeoEditStore>(chunkCoord, ChunkPrefab,
+                    _editStores.CreateFor(chunkCoord));
 
                 if (!GeoVolumeEngine.RegisterChunk(chunkCoord, chunk)) {
                     Debug.LogError($"{name}: failed to register chunk at {chunkCoord} - duplicate coord?");

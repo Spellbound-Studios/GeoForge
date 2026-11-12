@@ -7,7 +7,7 @@ using Spellbound.GeoForge;
 using UnityEngine.InputSystem;
 #endif
 
-namespace Spellbound.Sample4 {
+namespace Spellbound.GeoForge.Sample4 {
     /// <summary>
     /// Controller for Sample One, Digging a Hole.
     /// Not recommended as a real controller.

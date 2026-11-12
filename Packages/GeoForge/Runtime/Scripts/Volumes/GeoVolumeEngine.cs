@@ -587,26 +587,125 @@ namespace Spellbound.GeoForge {
         // data but never actually meshed until the background ValidateAllVolumesLodsAsync loop
         // happens to reach that chunk on its own.
         public void ResetEditedChunksToProcedural(GeoForgeDataGenerator dataGenerator) {
-            if (Manager == null)
-                return;
+            TryResetEditedChunksToProcedural(dataGenerator);
+        }
+
+        public bool ResetChunksToProcedural(IReadOnlyList<Vector3Int> chunkCoordinates) {
+            if (chunkCoordinates == null)
+                throw new ArgumentNullException(nameof(chunkCoordinates));
+
+            var edited = new List<Vector3Int>();
+
+            for (var index = 0; index < chunkCoordinates.Count; index++) {
+                var coordinate = chunkCoordinates[index];
+
+                if (ChunkDict.TryGetValue(coordinate, out var chunk) && HoldsStoredEdits(chunk))
+                    edited.Add(coordinate);
+            }
+
+            if (edited.Count == 0)
+                return true;
+
+            if (!TryRefillSource(null, edited.Count, out _))
+                return false;
+
+            for (var index = 0; index < edited.Count; index++)
+                ChunkDict[edited[index]].GeoChunkEngine.IGeoEditStore.Clear();
+
+            return RefillChunks(edited);
+        }
+
+        public bool RefillChunks(IReadOnlyList<Vector3Int> chunkCoordinates) {
+            if (chunkCoordinates == null)
+                throw new ArgumentNullException(nameof(chunkCoordinates));
+
+            if (chunkCoordinates.Count == 0)
+                return true;
+
+            if (!TryRefillSource(null, chunkCoordinates.Count, out var source))
+                return false;
+
+            var refilled = new List<IGeoChunk>();
+
+            for (var index = 0; index < chunkCoordinates.Count; index++) {
+                var coordinate = chunkCoordinates[index];
+
+                if (!ChunkDict.TryGetValue(coordinate, out var chunk))
+                    continue;
+
+                chunk.SetVoxels(CreateFillRequest(coordinate), source);
+                _meshedChunks.Remove(chunk);
+                refilled.Add(chunk);
+            }
+
+            ValidateResetChunks(refilled);
+
+            return true;
+        }
+
+        public Vector3 ChunkWorldOrigin(Vector3Int chunkCoordinate) {
+            ref var config = ref ConfigBlob.Value;
+
+            return Transform.TransformPoint((Vector3)chunkCoordinate * (config.ChunkSize * config.Resolution));
+        }
+
+        public float VoxelSize => ConfigBlob.Value.Resolution;
+
+        internal bool TryResetEditedChunksToProcedural(GeoForgeDataGenerator dataGenerator) {
+            var resetChunks = new List<IGeoChunk>();
+            var coordinates = new List<Vector3Int>();
+
+            foreach (var kvp in ChunkDict) {
+                if (!HoldsStoredEdits(kvp.Value))
+                    continue;
+
+                resetChunks.Add(kvp.Value);
+                coordinates.Add(kvp.Key);
+            }
+
+            if (resetChunks.Count == 0)
+                return true;
+
+            if (!TryRefillSource(dataGenerator, resetChunks.Count, out var source))
+                return false;
 
             _meshedChunks.Clear();
 
-            var resetChunks = new List<IGeoChunk>();
+            for (var index = 0; index < resetChunks.Count; index++)
+                ResetToProcedural(coordinates[index], resetChunks[index], source);
 
-            foreach (var kvp in ChunkDict) {
-                var chunk = kvp.Value;
+            ValidateResetChunks(resetChunks);
 
-                using var enumerator = chunk.GeoChunkEngine.IGeoEditStore.ReadAllEdits().GetEnumerator();
-                var hasEdits = enumerator.MoveNext();
+            return true;
+        }
 
-                if (!hasEdits)
-                    continue;
+        private bool TryRefillSource(GeoForgeDataGenerator dataGenerator, int chunks, out IDensitySource source) {
+            source = _densitySource ??
+                     (dataGenerator != null ? DensitySourceFor(dataGenerator) : _generatorDensitySource);
 
-                chunk.SetVoxels(CreateFillRequest(kvp.Key), DensitySourceFor(dataGenerator));
-                resetChunks.Add(chunk);
-            }
+            if (Manager != null && source != null)
+                return true;
 
+            var missing = Manager == null ? $"no {nameof(GeoForgeManager)}" : "no density source";
+            Log.Error($"{_owner.name}: {chunks} edited chunks were to be refilled, but the volume has {missing} to " +
+                      $"refill them with, so nothing was reset: their stores and voxels are kept. Give it one " +
+                      $"with {nameof(UseDensitySource)} or a manager before resetting.", _owner);
+
+            return false;
+        }
+
+        private static bool HoldsStoredEdits(IGeoChunk chunk) {
+            using var enumerator = chunk.GeoChunkEngine.IGeoEditStore.ReadAllEdits().GetEnumerator();
+
+            return enumerator.MoveNext();
+        }
+
+        private void ResetToProcedural(Vector3Int chunkCoordinate, IGeoChunk chunk, IDensitySource source) {
+            chunk.GeoChunkEngine.IGeoEditStore.Clear();
+            chunk.SetVoxels(CreateFillRequest(chunkCoordinate), source);
+        }
+
+        private void ValidateResetChunks(List<IGeoChunk> resetChunks) {
             if (resetChunks.Count == 0)
                 return;
 
@@ -860,10 +959,7 @@ namespace Spellbound.GeoForge {
         public T CreateChunk<T, TStore>(Vector3Int chunkCoord, GameObject chunkPrefab, TStore store)
             where T : class, IGeoChunk
             where TStore : IGeoEditStore {
-            ref var config = ref ConfigBlob.Value;
-
-            var localChunkPos = (Vector3)chunkCoord * (config.ChunkSize * config.Resolution);
-            var worldChunkPos = Transform.TransformPoint(localChunkPos);
+            var worldChunkPos = ChunkWorldOrigin(chunkCoord);
 
             var chunkObj = Object.Instantiate(
                 chunkPrefab,

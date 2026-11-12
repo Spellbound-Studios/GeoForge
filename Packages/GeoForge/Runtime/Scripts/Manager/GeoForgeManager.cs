@@ -71,8 +71,8 @@ namespace Spellbound.GeoForge {
 
         private void Awake() {
             McTablesBlob = MarchTables.Build(Allocator.Persistent);
-            ValidateAllVolumesLodsAsync();
             _isActive = true;
+            ValidateAllVolumesLodsAsync();
         }
 
         private void LateUpdate() {
@@ -136,17 +136,17 @@ namespace Spellbound.GeoForge {
 
         internal async void ValidateAllVolumesLodsAsync() {
             try {
-                while (true) {
+                do {
                     var volumeList = new List<IGeoVolume>(_voxelVolumes);
                     foreach (var volume in volumeList) {
-                        if (volume == null)
+                        if (volume == null || (volume is UnityEngine.Object unityObject && unityObject == null))
                             continue;
                         await volume.ValidateChunkLods();
                     }
 
 
                     await Awaitable.NextFrameAsync();
-                }
+                } while (_isActive);
             }
             finally {
                 Log.Debug($"{nameof(GeoForgeManager)}.{nameof(ValidateAllVolumesLodsAsync)} stopped.");
