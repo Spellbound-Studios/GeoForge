@@ -43,15 +43,4 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1e04aab200b24e7fac1f75a0b8d7dd16, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NetworkingMarchingCubes.TestChunk
-  _isSetup: 0
-  _prefabId: -2147483648
-  _componentIndex: -2147483648
-  _shouldBePooled: 0
-  _parent: {fileID: 0}
-  _invertedPathToNearestParent: 
-  _directChildren: []
-  _networkRules: {fileID: 0}
-  _visitiblityRules: {fileID: 0}
-  dataFactory: {fileID: 11400000, guid: 595aa38bbf477964f91f812c0426695e, type: 2}
-  boundaryOverrides: {fileID: 11400000, guid: 4f43f851bbe38eb47ab25e7b9ff01110, type: 2}
+  m_EditorClassIdentifier: GeoForge.Sample4::Spellbound.GeoForge.Sample4.NetworkedChunk

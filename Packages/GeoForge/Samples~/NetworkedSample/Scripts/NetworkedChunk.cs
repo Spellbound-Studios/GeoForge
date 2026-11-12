@@ -1,199 +1,20 @@
-﻿// Copyright (c) Spellbound Studios. All rights reserved.
+// Copyright (c) Spellbound Studios. All rights reserved.
 
-using System.Collections.Generic;
-using PurrNet;
-using Spellbound.Core;
-using Spellbound.Core.Logging;
-using Spellbound.GeoForge;
-using Spellbound.GeoForge.Sample4;
-using Unity.Collections;
 using UnityEngine;
 
-namespace GeoForge.Sample4 {
-    /// <summary>
-    /// Networked chunk implementation using PurrNet... Check with Valentin and Bobsi to see if the PurrNet section is
-    /// how they picture it being structured.
-    /// 
-    /// Ownership Model:
-    /// - 1 observer → That player owns the chunk (lag-free editing)
-    /// - 0 or 2+ observers → Server owns the chunk (server-authoritative editing)
-    /// 
-    /// This script is intended to give users a robust example of how they might structure terrain chunks using the
-    /// Marching Cubes API as well as the PurrNet framework. The script leverages PurrNet's lifecycles, network identity
-    /// callbacks, NetworkModules, and the visibility system to handle ownership tracking, exchange, and handoffs to
-    /// allow users to seamlessly swap between server authoritative and local terraforming based on client proximity.
-    /// This capability creates lag-free environment regardless of host ping and location.
-    ///
-    /// Edit application hook: GeoChunk's own constructor subscribes PassVoxelEdits to
-    /// IGeoEditStore.OnGeoEditChanged automatically, every time a GeoChunk is constructed - that
-    /// is the single, canonical path from "the store's data changed" to "the octree gets
-    /// revalidated." Do not add a second subscription for this (e.g. in OnSpawned) - a previous
-    /// version of this sample did exactly that via ApplyEditsToBaseChunk, which duplicated
-    /// PassVoxelEdits's own logic and ran a full unpack/release cycle a second time for every
-    /// edit batch, for no effect beyond wasted work.
-    /// </summary>
-    public class NetworkedChunk : NetworkIdentity, IGeoChunk {
-        [SerializeField] DataFactory dataFactory;
-
-        [SerializeField] BoundaryOverrides boundaryOverrides;
-        
-        
-        [SerializeField] private ExampleSyncModule _syncModule = new();
-        
-        private Vector3Int _chunkCoord;
-
+namespace Spellbound.GeoForge.Sample4 {
+    public class NetworkedChunk : MonoBehaviour, IGeoChunk {
         public GeoChunkEngine GeoChunkEngine { get; private set; }
 
-        /// <summary>
-        /// OnEarlySpawn (server-only) already constructs a placeholder GeoChunk using whatever
-        /// _chunkCoord happens to be at that point - Vector3Int.zero for a server-created chunk,
-        /// since nothing sets it before GeoVolume.CreateChunk calls this method. That placeholder
-        /// was never registered in ChunkDict (RegisterChunk is only ever called from here, with
-        /// the real coord), so a full GeoChunk.Dispose() on it would be unsafe: Dispose() calls
-        /// ChunkDict.Remove(_chunkCoord), which for an unregistered placeholder at (0,0,0) could
-        /// delete a DIFFERENT, legitimate chunk's entry if one genuinely exists at that coordinate.
-        /// Unsubscribing the stale GeoChunk's event handler directly avoids that collision while
-        /// still preventing the leaked subscription that would otherwise keep processing edits
-        /// against stale/default data forever.
-        /// </summary>
-        public void InitializeGeoChunk(Vector3Int coord, IGeoEditStore store) {
-            if (GeoChunkEngine != null)
-                GeoChunkEngine.IGeoEditStore.OnGeoEditChanged -= GeoChunkEngine.HandleResolvedVoxelEdits;
-
-            _chunkCoord = coord;
-            GeoChunkEngine = new GeoChunkEngine(this, transform, _syncModule, coord);
+        public void InitializeGeoChunk(Vector3Int coord, IGeoEditStore geoEditStore) {
+            GeoChunkEngine = new GeoChunkEngine(this, transform, geoEditStore, coord);
             GeoChunkEngine.IGeoEditStore.geoChunkEngine = GeoChunkEngine;
-            GeoChunkEngine.ParentGeoVolume.GeoVolumeEngine.RegisterChunk(coord, this);
         }
 
-        public void HandleMeshReady() {
-        }
+        public void HandleMeshReady() { }
 
-        public void RegenerateFromProceduralData() {
-            Debug.LogWarning("RegenerateFromProceduralData not implemented");
-        }
-
-        #region PurrNet Lifecycles, Events and Callbacks
-
-        protected override void OnEarlySpawn() {
-            _syncModule.SetChunkData();
-            GeoChunkEngine = new GeoChunkEngine(this, transform, _syncModule, _chunkCoord);
-        } 
-
-        protected override void OnDestroy() {
-            base.OnDestroy();
+        protected virtual void OnDestroy() {
             GeoChunkEngine?.Dispose();
         }
-
-        /// <summary>
-        /// Called when a player starts observing this chunk.
-        /// Server-side only.
-        /// </summary>
-        protected override void OnObserverAdded(PlayerID player) {
-            if (!isServer)
-                Debug.Log($"[Client] {player.id} is running in observer added lol bug");
-            
-            if (isServer)
-                Debug.Log($"[Server] {player.id} is running in observer added");
-            
-            SendToNewObserver(player, GeoChunkEngine.ChunkCoord);
-
-            // If this chunks observer count is less than or equal to 1 OR doesn't have an owner get out.
-            if (observers.Count <= 1 || !hasOwner)
-                return;
-
-            // Otherwise it does have an owner, and it has more than one observer and therefore should be owned by the
-            // server.
-            RemoveOwnership();
-
-            Debug.Log(
-                $"[Server] Chunk {GeoChunkEngine?.ChunkCoord} - Multiple observers ({observers.Count}), " +
-                "server taking authority");
-        }
-
-        /// <summary>
-        /// Called when a player stops observing this chunk.
-        /// Server-side only.
-        /// </summary>
-        protected override void OnObserverRemoved(PlayerID player) {
-            // If you're not the server get out.
-            if (!isServer)
-                return;
-
-            // If this chunks observer count is not equal to 1 get out because that means there are still multiple
-            // observers and therefore the server should still own it.
-            if (observers.Count != 1)
-                return;
-
-            // Otherwise... there is 1 observer, and we need to verify that the server owns it.
-            var isolatedPlayer = observers[0];
-
-            // If it does own it then get out.
-            if (owner == isolatedPlayer)
-                return;
-
-            // Otherwise we need the server to reclaim ownership.
-            GiveOwnership(isolatedPlayer);
-
-            Debug.Log(
-                $"[Server] Chunk {GeoChunkEngine?.ChunkCoord} - Single observer remaining, giving ownership to " +
-                $"{isolatedPlayer}");
-        }
-
-        /// <summary>
-        /// PurrNet callback that should trigger on any ownership change.
-        /// </summary>
-        protected override void OnOwnerChanged(PlayerID? oldOwner, PlayerID? newOwner, bool asServer) {
-            // Only print this if there is a new owner, I'm the owner, and I'm a client (avoid double prints).
-            if (newOwner.HasValue && isOwner && isClient)
-                Debug.Log($"[Client] I now own chunk {GeoChunkEngine?.ChunkCoord} - lag-free editing enabled!");
-        }
-
-        [TargetRpc(bufferLast: true)]
-        private void SendToNewObserver(PlayerID target, Vector3Int chunkCoord) {
-            // Lets error handle properly. If you're following this example then it should fit into the PurrNet
-            // lifecycle properly. However, if you're not and doing your own thing it's important to make sure it
-            // exists!
-            if (GeoChunkEngine == null) {
-                Debug.LogError("[Client] GeoChunk is null. Please ensure GeoChunk is created.", this);
-
-                return;
-            }
-            
-            _chunkCoord = chunkCoord;
-            gameObject.name = chunkCoord.ToString();
-            InitializeGeoChunk(_chunkCoord, _syncModule); // THIS LINE
-            
-            Debug.Log($"[Client] Initializing chunk at {GeoChunkEngine?.ChunkCoord}");
-            
-            InitializeChunk();
-        }
-        
-
-        #endregion
-
-        #region IChunk Implementation
-        
-        public void InitializeChunk(NativeArray<VoxelData> voxels = default) {
-            GeoChunkEngine.ParentGeoVolume.GeoVolumeEngine.RegisterChunk(GeoChunkEngine.ChunkCoord, this);
-            
-            if (boundaryOverrides != null) {
-                var overrides = boundaryOverrides.BuildChunkOverrides(
-                    GeoChunkEngine.ChunkCoord, GeoChunkEngine.ParentGeoVolume.ConfigBlob);
-                GeoChunkEngine.SetOverrides(overrides);
-            }
-
-            if (voxels == default)
-                voxels = new NativeArray<VoxelData>(
-                    GeoChunkEngine.ParentGeoVolume.ConfigBlob.Value.ChunkDataVolumeSize, Allocator.Persistent);
-            
-            dataFactory.FillDataArray(GeoChunkEngine.ChunkCoord, GeoChunkEngine.ParentGeoVolume.ConfigBlob, voxels);
-            GeoChunkEngine.SetVoxels(voxels);
-
-            if (voxels.IsCreated) 
-                voxels.Dispose();
-        }
-        
-        #endregion
     }
 }

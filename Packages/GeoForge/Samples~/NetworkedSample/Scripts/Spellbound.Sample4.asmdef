@@ -3,13 +3,13 @@
     "rootNamespace": "",
     "references": [
         "Spellbound.GeoForge",
+        "Spellbound.GeoForge.Networking",
+        "Spellbound.Networking",
+        "Spellbound.Networking.Replication",
         "Spellbound.Core",
+        "PurrNet.Runtime",
         "Unity.TextMeshPro",
         "Unity.InputSystem",
-        "com.rlabrecque.steamworks.net",
-        "PurrNet.Runtime",
-        "Unity.Entities",
-        "Unity.Collections",
         "Unity.Mathematics"
     ],
     "includePlatforms": [],
@@ -18,12 +18,22 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": ["SPELLBOUND_CORE"],
+    "defineConstraints": ["SPELLBOUND_CORE", "SPELLBOUND_NETWORKING", "PURRNET"],
     "versionDefines": [
         {
             "name": "com.spellboundstudios.core",
             "expression": "[1.1.9,3.0.0)",
             "define": "SPELLBOUND_CORE"
+        },
+        {
+            "name": "com.spellboundstudios.networking",
+            "expression": "[0.0.0,2.0.0)",
+            "define": "SPELLBOUND_NETWORKING"
+        },
+        {
+            "name": "dev.purrnet.purrnet",
+            "expression": "[1.25.0-beta.1,2.0.0)",
+            "define": "PURRNET"
         }
     ],
     "noEngineReferences": false

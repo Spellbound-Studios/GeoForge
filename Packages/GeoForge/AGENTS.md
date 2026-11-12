@@ -29,7 +29,7 @@ Samples in `Samples~`, imported from the Package Manager's Samples tab:
 - Networked Digging a Hole: Networked Version of the Digging a Hole sample scene. (`Samples~/NetworkedSample`)
 <!-- /spellbound:samples -->
 
-<!-- spellbound:depends db937e55 -->
+<!-- spellbound:depends c8e6687f -->
 Depends on:
 - `com.spellboundstudios.core` in [1.1.9,3.0.0)
 - `com.unity.entities` 1.3.15
@@ -38,7 +38,15 @@ Depends on:
 - `com.unity.burst` 1.8.19
 - `com.unity.collections` 2.5.7
 - `com.unity.modules.physics` 1.0.0
+Bridges, each compiled only when its package is installed:
+- `Spellbound.GeoForge.Networking` when `com.spellboundstudios.networking` is in [0.0.0,2.0.0)
 <!-- /spellbound:depends -->
+
+<!-- spellbound:doors e3bd200c -->
+Bridge doors in this project, the constructors of the types a bridge assembly adds:
+- `GeoForgeNetworkingKit` in `Spellbound.GeoForge.Networking`
+  - `static VoxelEditStores CreateEditStores(IGeoVolume volume, ref VoxelEditSourceSettings settings, ObservationContext observations)`
+<!-- /spellbound:doors -->
 
 ## Rules
 

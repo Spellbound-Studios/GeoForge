@@ -10,25 +10,32 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 28e93bf2b6064364aa5fd430134916ac, type: 3}
-  m_Name: UnsafeChunkVisibilityRules
-  m_EditorClassIdentifier: 
+  m_Name: SampleNetworkRules
+  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.NetworkRules
+  _rulesVersion: 1
+  _hostMigrationRules:
+    migrateAsHost: 1
+    sharePlayerCookiesWithPeers: 0
   _defaultSpawnRules:
-    spawnAuth: 1
-    despawnAuth: -1
+    spawnAuth: 0
+    despawnAuth: 3
     defaultOwner: 1
     propagateOwnershipByDefault: 1
     despawnIfOwnerDisconnects: 1
     cleanupSpawnedObjects: 1
+    includeInstantiatedSceneObjects: 0
+    autoSpawnOnInstantiate: 1
+    autoSpawnOnInstantiateAsync: 1
   _defaultRpcRules:
-    ignoreRequireServerAttribute: 1
-    ignoreRequireOwnerAttribute: 1
-    targetRpcsCanTargetServer: 1
+    ignoreRequireServerAttribute: 0
+    ignoreRequireOwnerAttribute: 0
+    targetRpcsCanTargetServer: 0
   _defaultVisibilityRules:
     visibilityMode: 0
   _defaultOwnershipRules:
-    assignAuth: 1
-    transferAuth: -1
-    removeAuth: -1
+    assignAuth: 0
+    transferAuth: 3
+    removeAuth: 0
     overrideWhenPropagating: 1
   _defaultSceneRules:
     _cleanupScenesOnDisconnect: 0
@@ -38,6 +45,7 @@ MonoBehaviour:
   _defaultIdentityRules:
     receiveRpcsWhenDisabled: 1
   _defaultTransformRules:
-    changeParentAuth: -1
+    changeParentAuth: 3
   _defaultMiscRules:
     syncedTickUpdateInterval: 1
+    versionMismatchBehaviour: 0

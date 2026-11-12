@@ -43,15 +43,24 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6eeb9f19aa2c4db9892850f081d850ae, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NetworkingMarchingCubes.MyVolume
-  config: {fileID: 11400000, guid: 1a71f712e11359545b0357a8503a60b8, type: 2}
-  dataFactory: {fileID: 11400000, guid: e708ac57d0c413241a51d64ad0ddcaa0, type: 2}
-  boundaryOverrides: {fileID: 11400000, guid: f1c6a6e91ce7fd841b158ec4145b6735, type: 2}
-  isMoving: 0
-  isPrimaryTerrain: 0
-  viewDistanceLodRanges:
-  - {x: 0, y: 8}
-  - {x: 8, y: 24}
-  - {x: 24, y: 56}
-  - {x: 56, y: 120}
-  chunkPrefab: {fileID: 7636707390037568543, guid: 33384b18741ec1d4e9941d18e374810a, type: 3}
+  m_EditorClassIdentifier: GeoForge.Sample4::Spellbound.GeoForge.Sample4.NetworkedVolume
+  manager: {fileID: 0}
+  <DataGenerator>k__BackingField: {fileID: 11400000, guid: 595aa38bbf477964f91f812c0426695e, type: 2}
+  <BoundaryOverrides>k__BackingField: {fileID: 11400000, guid: 4f43f851bbe38eb47ab25e7b9ff01110, type: 2}
+  <Config>k__BackingField: {fileID: 11400000, guid: 79155a67764bc2c488cd2d6cc669bb79, type: 2}
+  <ChunkPrefab>k__BackingField: {fileID: 7636707390037568543, guid: 33384b18741ec1d4e9941d18e374810a, type: 3}
+  <IsMoving>k__BackingField: 0
+  <IsPrimaryTerrain>k__BackingField: 0
+  <ViewDistanceLodRanges>k__BackingField:
+  - {x: 0, y: 70.02}
+  - {x: 70.02, y: 134.02}
+  - {x: 134.02, y: 262.02002}
+  - {x: 262.02002, y: 518.02}
+  networkManager: {fileID: 0}
+  replicationSettings: {fileID: 11400000, guid: d1ced87867a54364b92591cad5bfda42, type: 2}
+  editLayer: 0
+  worldIndex: 1
+  editSourceId: 1
+  terrainFingerprint: 1
+  viewerCollisionRadius: 1
+  viewerDetailRadius: 1

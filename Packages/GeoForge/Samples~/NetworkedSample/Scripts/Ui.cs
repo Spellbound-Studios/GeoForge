@@ -7,7 +7,7 @@ using UnityEngine.UI;
 using UnityEngine.InputSystem;
 #endif
 
-namespace Spellbound.Sample4 {
+namespace Spellbound.GeoForge.Sample4 {
     /// <summary>
     /// UI for Sample One, Digging a Hole.
     /// Not recommended as a real UI, because it is hard-coupled to the Controller.

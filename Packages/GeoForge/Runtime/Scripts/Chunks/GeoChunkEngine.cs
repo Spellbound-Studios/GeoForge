@@ -38,6 +38,7 @@ namespace Spellbound.GeoForge {
 
         private readonly GeoForgeManager _mcManager;
         private readonly int[] _presentedLeavesPerLevel;
+        private readonly List<(int, VoxelData)> _storedEdits = new();
 
         private BoundsInt _bounds;
         private DensityRange _densityRange;
@@ -166,6 +167,9 @@ namespace Spellbound.GeoForge {
         // so they can actually run concurrently on worker threads. Outside a batch (any other
         // caller of IGeoChunk.PassVoxelEdits), this stays fully synchronous, same as before.
         public void HandleResolvedVoxelEdits(List<(int, VoxelData)> newVoxelChanges) {
+            if (!VoxelsReady)
+                return;
+
             if (!ApplyVoxelEdits(newVoxelChanges, out var editBounds))
                 return;
 
@@ -220,6 +224,8 @@ namespace Spellbound.GeoForge {
             if (HasOverrides())
                 ApplyOverrides(voxels);
 
+            ApplyStoredEdits(voxels);
+
             var densityRangeArray = new NativeArray<DensityRange>(1, Allocator.TempJob);
 
             new DenseToSparseVoxelDataJob {
@@ -262,6 +268,30 @@ namespace Spellbound.GeoForge {
             // consumer waiting on MeshReady doesn't wait forever for a chunk that has nothing to mesh.
             if (_densityRange.IsSkippable())
                 SetMeshReady();
+        }
+
+        private void ApplyStoredEdits(NativeArray<VoxelData> voxels) {
+            if (IGeoEditStore.CopyEdits(_storedEdits) == 0)
+                return;
+
+            ref var config = ref ParentGeoVolume.ConfigBlob.Value;
+
+            for (var edit = 0; edit < _storedEdits.Count; edit++) {
+                var (index, voxel) = _storedEdits[edit];
+
+                if (index < 0 || index >= voxels.Length)
+                    continue;
+
+                GfStaticHelper.IndexToInt3(index, config.ChunkDataAreaSize, config.ChunkDataWidthSize, out var x,
+                    out var y, out var z);
+
+                if (_voxelOverrides.HasOverride(new Vector3Int(x, y, z)))
+                    continue;
+
+                voxels[index] = VoxelData.CreateImmature(voxel.Density, voxel.MaterialIndex);
+            }
+
+            _storedEdits.Clear();
         }
 
         public bool ApplyVoxelEdits(

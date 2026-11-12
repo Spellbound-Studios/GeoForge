@@ -13,7 +13,7 @@
         "com.unity.inputsystem": "1.11.2",
         "com.unity.ugui": "2.0.0"
       },
-      "hash": "70f6b4e0655993d0581447c1179394f8907eaff4"
+      "hash": "0f3d4eca9bdf335b76049f8fcf6bbd5370819d2e"
     },
     "com.spellboundstudios.geoforge": {
       "version": "file:GeoForge",
@@ -27,6 +27,13 @@
         "com.unity.collections": "2.5.7",
         "com.unity.modules.physics": "1.0.0"
       }
+    },
+    "com.spellboundstudios.networking": {
+      "version": "git@github.com:Spellbound-Studios/Networking.git?path=/Packages/Networking#beta",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "348538ec09463d004bdd3a6bf7c0aaf43360508b"
     },
     "com.spellboundstudios.packagecheck": {
       "version": "https://github.com/Spellbound-Studios/PackageCheck.git?path=/Packages/PackageCheck#beta",
@@ -304,6 +311,18 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       },
       "url": "https://packages.unity.com"
+    },
+    "dev.purrnet.purrnet": {
+      "version": "https://github.com/PurrNet/PurrNet.git?path=/Assets/PurrNet#dev",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.nuget.mono-cecil": "1.11.4",
+        "com.unity.nuget.newtonsoft-json": "3.2.1",
+        "com.unity.collections": "2.6.2",
+        "com.unity.mathematics": "1.3.2"
+      },
+      "hash": "2078576a8135238e1e3c0a0237e3b728bb02cb24"
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
