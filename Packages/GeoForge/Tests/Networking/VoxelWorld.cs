@@ -19,10 +19,15 @@ namespace Spellbound.GeoForge.Networking.Tests {
         private readonly Dictionary<Vector3Int, GeoChunk> _chunks = new();
         private readonly List<Vector3Int> _coordinates = new();
         private readonly GameObject _chunkTemplate;
-        private readonly IDensitySource _ground = new GroundDensitySource(GroundHeight);
+        private readonly IDensitySource _ground;
 
         internal VoxelWorld(string name, in VoxelEditSourceSettings settings, ObservationContext observations,
-            params Vector3Int[] chunkCoordinates) {
+            params Vector3Int[] chunkCoordinates)
+            : this(name, settings, observations, new GroundDensitySource(GroundHeight), chunkCoordinates) { }
+
+        internal VoxelWorld(string name, in VoxelEditSourceSettings settings, ObservationContext observations,
+            IDensitySource ground, params Vector3Int[] chunkCoordinates) {
+            _ground = ground;
             Manager = Track(new GameObject(name + " Manager")).AddComponent<GeoForgeManager>();
             typeof(GeoForgeManager).GetProperty("McTablesBlob", BindingFlags.Instance | BindingFlags.NonPublic)
                 .SetValue(Manager, MarchTables.Build(Allocator.Persistent));

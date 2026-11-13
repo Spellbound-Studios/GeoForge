@@ -37,14 +37,8 @@ namespace Spellbound.GeoForge {
             if (_volume.DensitySource is not IOccupancySource occupancy)
                 return false;
 
-            return occupancy.Classify(ToFillSpace(nodeBoundsVoxelSpace)) != Occupancy.Mixed;
-        }
-
-        private Bounds ToFillSpace(in Bounds boundsVoxelSpace) {
-            ref var config = ref _volume.ConfigBlob.Value;
-
-            return new Bounds((boundsVoxelSpace.center + config.Offset) * config.Resolution,
-                boundsVoxelSpace.size * config.Resolution);
+            return occupancy.Classify(ChunkLayout.FillSpaceBounds(nodeBoundsVoxelSpace, _volume.ConfigBlob.Value)) !=
+                   Occupancy.Mixed;
         }
     }
 }

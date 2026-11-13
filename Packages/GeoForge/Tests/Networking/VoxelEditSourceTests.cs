@@ -91,6 +91,71 @@ namespace Spellbound.GeoForge.Networking.Tests {
         }
 
         [Test]
+        public void VoxelEditSource_OverOccupancySkip_SnapshotThenChangesEqualsOneState() {
+            var authorityGround = new GroundOccupancySource(VoxelWorld.GroundHeight);
+            var joinerGround = new GroundOccupancySource(VoxelWorld.GroundHeight);
+            var lateGround = new GroundOccupancySource(VoxelWorld.GroundHeight);
+            var authority = CreateOverOccupancy("Skip Snapshot Authority", authorityGround, VoxelWorld.ChunkSize, true,
+                FirstChunk, SecondChunk);
+            var joiner = CreateOverOccupancy("Skip Snapshot Joiner", joinerGround, VoxelWorld.ChunkSize, true,
+                FirstChunk, SecondChunk);
+            var late = CreateOverOccupancy("Skip Snapshot Late", lateGround, VoxelWorld.ChunkSize, true, FirstChunk,
+                SecondChunk);
+            var key = authority.Stores.ChunkRegions.RegionOf(FirstChunk);
+            var source = authority.Stores.SourceFor(key);
+            Assert.AreEqual(0, authorityGround.Fills + joinerGround.Fills + lateGround.Fills);
+
+            Assert.IsTrue(GeoForgeCommands.RemoveSphere(authority.GeoVolume, InsideTheFirstChunk, WideRadius,
+                DigStrength));
+            source.ClearChanges();
+
+            var pages = VoxelEditTransfer.CopySnapshot(source, joiner.Stores.SourceFor(key), SmallPageBytes);
+            Assert.Greater(pages, 1);
+
+            Assert.IsTrue(GeoForgeCommands.RemoveSphere(authority.GeoVolume, BesideTheFirstEdit, NarrowRadius,
+                GentleStrength));
+            Assert.Greater(source.PendingChanges, 0);
+            VoxelEditTransfer.CopyChanges(source, joiner.Stores.SourceFor(key));
+
+            VoxelEditTransfer.CopySnapshot(source, late.Stores.SourceFor(key), LargePageBytes);
+
+            var digest = VoxelEditDigest.Of(authority);
+            Assert.Greater(VoxelEditDigest.CountOf(authority), 0);
+            Assert.AreEqual(digest, VoxelEditDigest.Of(joiner));
+            Assert.AreEqual(digest, VoxelEditDigest.Of(late));
+            Assert.AreEqual(1, authorityGround.Fills);
+            Assert.AreEqual(1, joinerGround.Fills);
+            Assert.AreEqual(1, lateGround.Fills);
+            AssertEveryRecordIsApplied(authority);
+            AssertEveryRecordIsApplied(joiner);
+            AssertEveryRecordIsApplied(late);
+            Assert.AreEqual(authority.VoxelAt(InsideTheFirstChunk), joiner.VoxelAt(InsideTheFirstChunk));
+            Assert.AreEqual(authority.VoxelAt(BesideTheFirstEdit), joiner.VoxelAt(BesideTheFirstEdit));
+            Assert.AreEqual(authority.VoxelAt(BesideTheFirstEdit), late.VoxelAt(BesideTheFirstEdit));
+        }
+
+        [Test]
+        public void VoxelEditSource_OverOccupancySkip_IsFilledWaitsForTheRealFill() {
+            var ground = new GroundOccupancySource(VoxelWorld.GroundHeight);
+            var world = CreateOverOccupancy("Skip Filled", ground, TwoChunksWide, false, FirstChunk, SecondChunk);
+            var key = world.Stores.ChunkRegions.RegionOf(FirstChunk);
+            var source = world.Stores.SourceFor(key);
+            Assert.AreEqual(key, world.Stores.ChunkRegions.RegionOf(SecondChunk));
+
+            world.StoreOf(FirstChunk).Write(Edits(3, 40, 7));
+            Assert.IsFalse(source.IsReady);
+
+            world.Fill(SecondChunk);
+            Assert.IsFalse(source.IsReady);
+            Assert.AreEqual(0, ground.Fills);
+
+            world.Fill(FirstChunk);
+            Assert.IsTrue(source.IsReady);
+            Assert.AreEqual(1, ground.Fills);
+            AssertEveryRecordIsApplied(world);
+        }
+
+        [Test]
         public void VoxelEditSource_ApplyTwiceIsOneState() {
             var authority = Create("Twice Authority", null, FirstChunk);
             var once = Create("Twice Once", null, FirstChunk);
@@ -307,6 +372,26 @@ namespace Spellbound.GeoForge.Networking.Tests {
         private static void WriteEveryChunk(VoxelWorld world, List<(int, VoxelData)> edits) {
             for (var index = 0; index < ThreeChunks.Length; index++)
                 world.StoreOf(ThreeChunks[index]).Write(edits);
+        }
+
+        private VoxelWorld CreateOverOccupancy(string name, GroundOccupancySource ground, float cellSizeMetres,
+            bool fill, params Vector3Int[] chunks) {
+            var world = new VoxelWorld(name, new VoxelEditSourceSettings(BaseFingerprint, SourceId, null, 0,
+                cellSizeMetres), _observations, ground);
+            _worlds.Add(world);
+
+            foreach (var chunk in chunks)
+                world.AddChunk(chunk, fill);
+
+            return world;
+        }
+
+        private static void AssertEveryRecordIsApplied(VoxelWorld world) {
+            foreach (var (chunk, index, voxel) in VoxelEditDigest.Records(world)) {
+                var applied = world.Engine.GetChunkByCoord(chunk).GeoChunkEngine.GetVoxelData(index);
+                Assert.AreEqual(voxel.Density, applied.Density, $"chunk {chunk}, index {index}");
+                Assert.AreEqual(voxel.GetPlainMatIndex(), applied.GetPlainMatIndex(), $"chunk {chunk}, index {index}");
+            }
         }
 
         private VoxelWorld Create(string name, IChunkRegionMap map, params Vector3Int[] chunks) {

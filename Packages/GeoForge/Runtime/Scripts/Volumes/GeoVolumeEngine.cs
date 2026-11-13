@@ -41,10 +41,13 @@ namespace Spellbound.GeoForge {
             _ownerAsIGeoVolume = ownerAsIGeoVolume;
             Manager = manager;
             ConfigBlob = VolumeConfigBlobCreator.CreateVolumeConfigBlobAsset(config);
+            SkipFillByOccupancy = config.skipFillByOccupancy;
             _bounds = CalculateVolumeBounds();
         }
 
         public BlobAssetReference<VolumeConfigBlobAsset> ConfigBlob { get; }
+
+        public bool SkipFillByOccupancy { get; }
 
         public GeoForgeManager Manager { get; }
 
@@ -57,6 +60,8 @@ namespace Spellbound.GeoForge {
         }
 
         public IDensitySource DensitySource => _densitySource;
+
+        internal IDensitySource RefillSource => _densitySource ?? _generatorDensitySource;
 
         public VolumeVersion Version { get; private set; }
 
@@ -307,7 +312,8 @@ namespace Spellbound.GeoForge {
         ///     This relies on each chunk's dense voxel array already including its halo of neighbor-owned
         ///     voxels (the same halo marching cubes itself needs to generate correct boundary triangles),
         ///     so the owning chunk's own array already has valid data for corners just outside its bounds.
-        ///     Returns false if that chunk has no voxel data, or none of the 8 corners are solid.
+        ///     Returns false if that chunk has no voxel data, none of the 8 corners are solid, or the
+        ///     resolved corner holds the null material (a uniform chunk not yet filled).
         ///     Only solid ("full") corners are considered for material - an empty/air corner's
         ///     MaterialIndex isn't meaningful. If every solid corner shares one material, that's the
         ///     result; if they disagree, this returns the solid corner nearest worldPosition - a
@@ -379,7 +385,7 @@ namespace Spellbound.GeoForge {
             materialIndex = allSolidMaterialsMatch ? firstSolidMaterial : nearestSolidMaterial;
             materialIndex = VoxelEncoding.MaterialIndex(materialIndex);
 
-            return true;
+            return materialIndex != VoxelEncoding.NullMaterialIndex;
         }
 
         public bool TryQuerySurfaceCase(Vector3 worldPosition, out SurfaceCase surfaceCase) {
@@ -680,8 +686,7 @@ namespace Spellbound.GeoForge {
         }
 
         private bool TryRefillSource(GeoForgeDataGenerator dataGenerator, int chunks, out IDensitySource source) {
-            source = _densitySource ??
-                     (dataGenerator != null ? DensitySourceFor(dataGenerator) : _generatorDensitySource);
+            source = dataGenerator != null ? DensitySourceFor(dataGenerator) : RefillSource;
 
             if (Manager != null && source != null)
                 return true;

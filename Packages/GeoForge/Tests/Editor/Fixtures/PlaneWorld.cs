@@ -20,7 +20,11 @@ namespace Spellbound.GeoForge.Tests {
             : this(ChunkSize, 1, new PlaneDensitySource(planeHeight), chunkCoordinates) { }
 
         internal PlaneWorld(
-            int chunkSize, int levelsOfDetail, IDensitySource source, params Vector3Int[] chunkCoordinates) {
+            int chunkSize, int levelsOfDetail, IDensitySource source, params Vector3Int[] chunkCoordinates)
+            : this(chunkSize, levelsOfDetail, source, true, chunkCoordinates) { }
+
+        internal PlaneWorld(int chunkSize, int levelsOfDetail, IDensitySource source, bool skipFillByOccupancy,
+            params Vector3Int[] chunkCoordinates) {
             _chunkSize = chunkSize;
             Manager = Track(new GameObject("Plane World Manager")).AddComponent<GeoForgeManager>();
             typeof(GeoForgeManager)
@@ -35,6 +39,7 @@ namespace Spellbound.GeoForge.Tests {
             config.chunkSize = chunkSize;
             config.sizeInChunks = Vector3Int.one;
             config.validatesPerFrame = chunkCoordinates.Length + 1;
+            config.skipFillByOccupancy = skipFillByOccupancy;
 
             Volume = Track(new GameObject("Plane World Volume")).AddComponent<GeoVolumeDouble>();
             Engine = new GeoVolumeEngine(Volume, Volume, config, Manager);
@@ -51,13 +56,7 @@ namespace Spellbound.GeoForge.Tests {
             var dataWidth = ChunkLayout.DataWidth(chunkSize);
 
             foreach (var coordinate in chunkCoordinates) {
-                var chunkTransform = new GameObject($"Plane World Chunk {coordinate}").transform;
-                chunkTransform.SetParent(Volume.transform, false);
-                chunkTransform.localPosition = (Vector3)(coordinate * chunkSize);
-                var chunk = new GeoChunkDouble(chunkTransform, coordinate);
-                _chunks.Add(chunk);
-                Engine.RegisterChunk(coordinate, chunk);
-
+                var chunk = AddChunk(coordinate);
                 var origin = ChunkLayout.ChunkOrigin(new int3(coordinate.x, coordinate.y, coordinate.z),
                     Engine.ConfigBlob.Value);
                 var request = new ChunkFillRequest(coordinate, new Vector3Int(origin.x, origin.y, origin.z),
@@ -88,6 +87,21 @@ namespace Spellbound.GeoForge.Tests {
                 if (_created[index] != null)
                     Object.DestroyImmediate(_created[index]);
             }
+        }
+
+        internal GeoChunkDouble AddChunk(Vector3Int coordinate) {
+            return AddChunk(coordinate, new GeoEditStore());
+        }
+
+        internal GeoChunkDouble AddChunk(Vector3Int coordinate, IGeoEditStore editStore) {
+            var chunkTransform = new GameObject($"Plane World Chunk {coordinate}").transform;
+            chunkTransform.SetParent(Volume.transform, false);
+            chunkTransform.localPosition = (Vector3)(coordinate * _chunkSize);
+            var chunk = new GeoChunkDouble(chunkTransform, coordinate, editStore);
+            _chunks.Add(chunk);
+            Engine.RegisterChunk(coordinate, chunk);
+
+            return chunk;
         }
 
         internal void ValidateEveryChunk(Vector3 viewerPosition) {

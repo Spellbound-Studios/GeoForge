@@ -1,10 +1,13 @@
 // Copyright (c) Spellbound Studios. All rights reserved.
 
 using NUnit.Framework;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Spellbound.GeoForge.Tests {
     public class VoxelEncodingTests {
+        private const int FractionBitStride = 1024;
+
         private static readonly float[] Gradients = { 0.5f, 1f, 8f, 32f, 127f, 200f };
 
         [Test]
@@ -69,6 +72,28 @@ namespace Spellbound.GeoForge.Tests {
         }
 
         [Test]
+        public void VoxelEncoding_DensityFromFractionEqualsTheVoxelizeExpression() {
+            var lastBits = math.asint(1f);
+            var mismatches = 0;
+            var firstMismatch = float.NaN;
+
+            for (var bits = 0; bits <= lastBits; bits += FractionBitStride)
+                CountFractionMismatch(math.asfloat(bits), ref mismatches, ref firstMismatch);
+
+            for (var step = 0; step <= 256; step++) {
+                CountFractionMismatch(step / 255f, ref mismatches, ref firstMismatch);
+                CountFractionMismatch(step / 256f, ref mismatches, ref firstMismatch);
+            }
+
+            CountFractionMismatch(0f, ref mismatches, ref firstMismatch);
+            CountFractionMismatch(1f, ref mismatches, ref firstMismatch);
+
+            Assert.AreEqual(0, mismatches, $"first mismatch at fraction {firstMismatch:R}");
+            Assert.AreEqual(sbyte.MinValue, VoxelEncoding.DensityFromFraction(0f));
+            Assert.AreEqual(sbyte.MaxValue, VoxelEncoding.DensityFromFraction(1f));
+        }
+
+        [Test]
         public void SignedDistanceFromDensityInvertsWithinOneDensityStep() {
             foreach (var gradient in Gradients) {
                 var limit = sbyte.MaxValue / gradient;
@@ -95,6 +120,16 @@ namespace Spellbound.GeoForge.Tests {
             var density = -signedDistance * gradient;
 
             return (sbyte)Mathf.Clamp(density, sbyte.MinValue, sbyte.MaxValue);
+        }
+
+        private static void CountFractionMismatch(float fraction, ref int mismatches, ref float firstMismatch) {
+            if (VoxelEncoding.DensityFromFraction(fraction) == (sbyte)(fraction * byte.MaxValue + sbyte.MinValue))
+                return;
+
+            if (mismatches == 0)
+                firstMismatch = fraction;
+
+            mismatches++;
         }
     }
 }

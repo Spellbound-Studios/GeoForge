@@ -32,6 +32,22 @@ namespace Spellbound.GeoForge {
                 Mathf.FloorToInt((voxelPosition.z - (float)FirstOwnedVoxel) / chunkSize));
         }
 
+        internal static Bounds FillSpaceBounds(in Bounds boundsVoxelSpace, in VolumeConfigBlobAsset config) {
+            return FillSpaceBounds(new Bounds(boundsVoxelSpace.center + config.Offset, boundsVoxelSpace.size),
+                config.Resolution);
+        }
+
+        public static Bounds FillSpaceBounds(in ChunkFillRequest request) {
+            var span = request.DataWidth - 1;
+            var centre = (Vector3)request.OriginVoxel + Vector3.one * (span * 0.5f);
+
+            return FillSpaceBounds(new Bounds(centre, Vector3.one * span), request.VoxelSize);
+        }
+
+        private static Bounds FillSpaceBounds(in Bounds fillVoxelBounds, float voxelSize) {
+            return new Bounds(fillVoxelBounds.center * voxelSize, fillVoxelBounds.size * voxelSize);
+        }
+
         public static NativeArray<float4> CornerWeights(int chunkSize, Allocator allocator) {
             var width = DataWidth(chunkSize);
             var weights = new NativeArray<float4>(width * width, allocator);

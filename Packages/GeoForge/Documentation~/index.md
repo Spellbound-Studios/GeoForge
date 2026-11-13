@@ -15,5 +15,5 @@ GeoForge turns a density field into meshes: octree chunks, marching cubes with T
 - `GeoForgeManager` schedules the march jobs, completes them in batches and hands each leaf's mesh to the presenter.
 - `IChunkPresenter` and `IChunkLeaf` are the seam through which a chunk is drawn; `GameObjectChunkPresenter` is the default.
 - `GeoForgeCommands` edits a volume with spheres, cubes and arcs; each chunk's `IGeoEditStore` keeps the edits.
-- `TryQueryVoxel`, `TryQuerySurfaceMaterial` and `TryQuerySurfaceCase` read the voxels, the material and the marching cubes cell at a world position.
+- `TryQueryVoxel`, `TryQuerySurfaceMaterial` and `TryQuerySurfaceCase` read the voxels, the material and the marching cubes cell at a world position. A chunk the density source classifies all rock or all air is not filled: it reads as the uniform density with no material until its first edit or a store-facing read fills it, and `TryQuerySurfaceMaterial` answers false there.
 - `MaterialSideTable<TData>` carries per-material data a game reads through `GeoForgeManager.GetMaterialData<TData>`, with an inspector that syncs it against the `VoxelMaterialDatabase`.
