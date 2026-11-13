@@ -43,6 +43,10 @@ namespace Spellbound.GeoForge {
         [Tooltip("How many chunks have their LODs validated per frame")] [Range(1, 10)] [SerializeField]
         internal int validatesPerFrame = 1;
 
+        [Tooltip("Whether a chunk with no edits, that the density source classifies as all air or all rock, " +
+                 "skips its fill until it is first edited")] [SerializeField]
+        internal bool skipFillByOccupancy = true;
+
         [Tooltip(
             "This dimension is derived from your other settings. Indicates actual size of geoVolume, if its finite.")]
         [SerializeField]

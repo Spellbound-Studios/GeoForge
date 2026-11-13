@@ -18,6 +18,11 @@ namespace Spellbound.GeoForge {
             return density / (float)sbyte.MaxValue;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static sbyte DensityFromFraction(float solidFraction) {
+            return (sbyte)(solidFraction * byte.MaxValue + sbyte.MinValue);
+        }
+
         public static sbyte DensityFromSignedDistance(float signedDistance, float gradient) {
             var density = -signedDistance * gradient;
 

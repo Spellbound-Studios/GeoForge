@@ -8,8 +8,11 @@ namespace Spellbound.GeoForge.Tests {
     internal sealed class GeoChunkDouble : IGeoChunk {
         internal GeoChunkDouble(Transform transform) : this(transform, Vector3Int.zero) { }
 
-        internal GeoChunkDouble(Transform transform, Vector3Int coordinate) {
-            GeoChunkEngine = new GeoChunkEngine(this, transform, new GeoEditStore(), coordinate);
+        internal GeoChunkDouble(Transform transform, Vector3Int coordinate)
+            : this(transform, coordinate, new GeoEditStore()) { }
+
+        internal GeoChunkDouble(Transform transform, Vector3Int coordinate, IGeoEditStore editStore) {
+            GeoChunkEngine = new GeoChunkEngine(this, transform, editStore, coordinate);
             GeoChunkEngine.IGeoEditStore.geoChunkEngine = GeoChunkEngine;
         }
 

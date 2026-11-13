@@ -206,6 +206,9 @@ namespace Spellbound.GeoForge {
                             continue;
                         }
 
+                        if (!chunk.GeoChunkEngine.CanResolveEdits())
+                            continue;
+
                         // Presized from the exact known count, rather than growing via repeated
                         // reallocate-and-copy as entries are appended.
                         var deltas = new List<VoxelDensityDelta>(resultMap.CountValuesForKey(key));

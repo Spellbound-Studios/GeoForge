@@ -2,6 +2,8 @@
 
 using System;
 using System.Collections.Generic;
+using Spellbound.Core.Ground;
+using Spellbound.Core.Logging;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -43,7 +45,9 @@ namespace Spellbound.GeoForge {
         private BoundsInt _bounds;
         private DensityRange _densityRange;
         private bool _isDisposed;
+        private bool _reportedMissingFillSource;
         private NativeList<SparseVoxelData> _sparseVoxels;
+        private ChunkFillRequest _uniformFillRequest;
         private VoxelOverrides _voxelOverrides;
 
         public GeoChunkEngine(
@@ -88,6 +92,8 @@ namespace Spellbound.GeoForge {
         public bool MeshReady { get; private set; }
 
         internal int FinestBuiltLevel { get; private set; } = ChunkResidency.NoBuiltLevel;
+
+        internal bool IsUniform { get; private set; }
 
         public void Dispose() {
             // Idempotent by design, not by accident: everything this touches downstream (event
@@ -167,7 +173,7 @@ namespace Spellbound.GeoForge {
         // so they can actually run concurrently on worker threads. Outside a batch (any other
         // caller of IGeoChunk.PassVoxelEdits), this stays fully synchronous, same as before.
         public void HandleResolvedVoxelEdits(List<(int, VoxelData)> newVoxelChanges) {
-            if (!VoxelsReady)
+            if (!VoxelsReady || newVoxelChanges.Count == 0)
                 return;
 
             if (!ApplyVoxelEdits(newVoxelChanges, out var editBounds))
@@ -202,7 +208,74 @@ namespace Spellbound.GeoForge {
                     $"A fill of data width {request.DataWidth} does not fit a chunk of data width {dataWidth}.",
                     nameof(request));
 
+            if (ClassifiesUniform(request, source, out var solid)) {
+                SetUniform(solid, request);
+
+                return;
+            }
+
             SetVoxels(GeoForgeKit.Generate(source, request, Allocator.Persistent));
+        }
+
+        private bool ClassifiesUniform(in ChunkFillRequest request, IDensitySource source, out bool solid) {
+            solid = false;
+
+            if (!ParentGeoVolume.GeoVolumeEngine.SkipFillByOccupancy || source is not IOccupancySource occupancy)
+                return false;
+
+            if (!ReferenceEquals(source, ParentGeoVolume.GeoVolumeEngine.RefillSource))
+                return false;
+
+            if (HasOverrides() || IGeoEditStore.HasEdits)
+                return false;
+
+            var classification = occupancy.Classify(ChunkLayout.FillSpaceBounds(request));
+            solid = classification == Occupancy.Solid;
+
+            return classification != Occupancy.Mixed;
+        }
+
+        private void SetUniform(bool solid, in ChunkFillRequest request) {
+            var density = solid ? sbyte.MaxValue : sbyte.MinValue;
+
+            if (_sparseVoxels.IsCreated)
+                _sparseVoxels.Clear();
+            else
+                _sparseVoxels = new NativeList<SparseVoxelData>(1, Allocator.Persistent);
+
+            _sparseVoxels.Add(new SparseVoxelData(VoxelData.CreateImmature(density, VoxelEncoding.NullMaterialIndex),
+                0));
+            _densityRange = new DensityRange(density, density);
+            ResetFilledState();
+
+            _uniformFillRequest = request;
+            IsUniform = true;
+
+            RaiseFilled();
+            SetMeshReady();
+        }
+
+        private void FillIfUniform() {
+            if (!IsUniform || !CanResolveEdits())
+                return;
+
+            SetVoxels(GeoForgeKit.Generate(ParentGeoVolume.GeoVolumeEngine.RefillSource, _uniformFillRequest,
+                Allocator.Persistent));
+        }
+
+        internal bool CanResolveEdits() {
+            if (!IsUniform || ParentGeoVolume.GeoVolumeEngine.RefillSource != null)
+                return true;
+
+            if (!_reportedMissingFillSource) {
+                _reportedMissingFillSource = true;
+                Log.Error($"Chunk {ChunkCoord} cannot be filled: its volume has no density source. The chunk stays " +
+                          "uniform and refuses edits until it is filled, and its reads answer the uniform stand-in " +
+                          "density with the null material, so an edit resolved by reading it resolves against the " +
+                          "stand-in.");
+            }
+
+            return false;
         }
 
         public void SetVoxels(NativeArray<VoxelData> voxels) {
@@ -214,9 +287,7 @@ namespace Spellbound.GeoForge {
                 return;
             }
 
-            VoxelsReady = false;
-            MeshReady = false;
-            FinestBuiltLevel = ChunkResidency.NoBuiltLevel;
+            IsUniform = false;
 
             if (_sparseVoxels.IsCreated) _sparseVoxels.Dispose();
             _sparseVoxels = new NativeList<SparseVoxelData>(Allocator.Persistent);
@@ -247,19 +318,12 @@ namespace Spellbound.GeoForge {
             // stale relative to what was just written. Evict it from both pools unconditionally, so the
             // next checkout anywhere is forced to do a real unpack from the now-current _sparseVoxels
             // instead of silently handing back the old data via the "already resident" fast path.
-            _mcManager.InvalidateChunkResidency(ParentGeoVolume.ConfigBlob.Value.ChunkSize, this);
-
-            if (RootNode != null) RootNode.Dispose();
-            Array.Clear(_presentedLeavesPerLevel, 0, _presentedLeavesPerLevel.Length);
+            ResetFilledState();
 
             RootNode = new OctreeNode(Vector3Int.zero, ParentGeoVolume.ConfigBlob.Value.LevelsOfDetail, _implementer,
                 ParentGeoVolume);
 
-            VoxelsReady = true;
-            RaiseResidency(ChunkResidencyState.Resident);
-            ParentGeoVolume.GeoVolumeEngine?.RaiseChanged(ChunkCoord,
-                new BoundsInt(ChunkCoord * ParentGeoVolume.ConfigBlob.Value.ChunkSize,
-                    Vector3Int.one * ParentGeoVolume.ConfigBlob.Value.ChunkDataWidthSize));
+            RaiseFilled();
 
             // A skippable density range means this chunk will never produce a leaf/mesh at all -
             // OctreeNode.ValidateOctreeLods early-returns on DensityRange.IsSkippable() before it
@@ -268,6 +332,25 @@ namespace Spellbound.GeoForge {
             // consumer waiting on MeshReady doesn't wait forever for a chunk that has nothing to mesh.
             if (_densityRange.IsSkippable())
                 SetMeshReady();
+        }
+
+        private void ResetFilledState() {
+            _reportedMissingFillSource = false;
+            VoxelsReady = false;
+            MeshReady = false;
+            FinestBuiltLevel = ChunkResidency.NoBuiltLevel;
+            _mcManager.InvalidateChunkResidency(ParentGeoVolume.ConfigBlob.Value.ChunkSize, this);
+            RootNode?.Dispose();
+            RootNode = null;
+            Array.Clear(_presentedLeavesPerLevel, 0, _presentedLeavesPerLevel.Length);
+        }
+
+        private void RaiseFilled() {
+            VoxelsReady = true;
+            RaiseResidency(ChunkResidencyState.Resident);
+            ParentGeoVolume.GeoVolumeEngine?.RaiseChanged(ChunkCoord,
+                new BoundsInt(ChunkCoord * ParentGeoVolume.ConfigBlob.Value.ChunkSize,
+                    Vector3Int.one * ParentGeoVolume.ConfigBlob.Value.ChunkDataWidthSize));
         }
 
         private void ApplyStoredEdits(NativeArray<VoxelData> voxels) {
@@ -296,54 +379,71 @@ namespace Spellbound.GeoForge {
 
         public bool ApplyVoxelEdits(
             List<(int, VoxelData)> voxelChanges, out BoundsInt editBounds, BoundsInt existingEditBounds = default) {
-            ref var config = ref ParentGeoVolume.ConfigBlob.Value;
-            var voxelArray = GetVoxelDataArray(true);
-
-            var hasEdits = false;
             editBounds = existingEditBounds;
 
-            foreach (var voxelChange in voxelChanges) {
-                var index = voxelChange.Item1;
+            if (voxelChanges.Count == 0)
+                return false;
 
-                GfStaticHelper.IndexToInt3(index, config.ChunkDataAreaSize, config.ChunkDataWidthSize, out var x,
-                    out var y, out var z);
-                var voxelPos = new Vector3Int(x, y, z);
+            var volumeEngine = ParentGeoVolume.GeoVolumeEngine;
+            volumeEngine.HoldEvents();
 
-                if (_voxelOverrides.HasOverride(voxelPos))
-                    continue;
+            try {
+                FillIfUniform();
 
-                voxelArray[index] =
-                    VoxelData.CreateImmature(voxelChange.Item2.Density, voxelChange.Item2.MaterialIndex);
+                if (IsUniform)
+                    return false;
 
-                if (!hasEdits) {
-                    editBounds = new BoundsInt(voxelPos, Vector3Int.one);
-                    hasEdits = true;
+                ref var config = ref ParentGeoVolume.ConfigBlob.Value;
+                var voxelArray = GetVoxelDataArray(true);
+
+                var hasEdits = false;
+
+                foreach (var voxelChange in voxelChanges) {
+                    var index = voxelChange.Item1;
+
+                    GfStaticHelper.IndexToInt3(index, config.ChunkDataAreaSize, config.ChunkDataWidthSize, out var x,
+                        out var y, out var z);
+                    var voxelPos = new Vector3Int(x, y, z);
+
+                    if (_voxelOverrides.HasOverride(voxelPos))
+                        continue;
+
+                    voxelArray[index] =
+                        VoxelData.CreateImmature(voxelChange.Item2.Density, voxelChange.Item2.MaterialIndex);
+
+                    if (!hasEdits) {
+                        editBounds = new BoundsInt(voxelPos, Vector3Int.one);
+                        hasEdits = true;
+                    }
+                    else {
+                        var min = Vector3Int.Min(editBounds.min, voxelPos);
+                        var max = Vector3Int.Max(editBounds.max, voxelPos + Vector3Int.one);
+                        editBounds = new BoundsInt(min, max - min);
+                    }
+
+                    // DensityRange is a struct - the public DensityRange property only has a getter, so
+                    // calling Encapsulate through it (as this used to) mutates a throwaway copy and never
+                    // reaches _densityRange. Mutate the field directly since we're inside GeoChunk itself.
+                    _densityRange.Encapsulate(voxelChange.Item2.Density);
                 }
-                else {
-                    var min = Vector3Int.Min(editBounds.min, voxelPos);
-                    var max = Vector3Int.Max(editBounds.max, voxelPos + Vector3Int.one);
-                    editBounds = new BoundsInt(min, max - min);
+
+                if (hasEdits) {
+                    _mcManager.PackVoxelArray(config.ChunkSize, this, true, editBounds);
+
+                    // Any cached "empty" result may no longer hold once the underlying voxel data has
+                    // changed - wipe the whole cache rather than figuring out which addresses actually
+                    // overlap editBounds. See the field's own comment for why whole-chunk invalidation
+                    // is the right tradeoff here.
+                    _knownEmptyOctreeAddresses.Clear();
                 }
 
-                // DensityRange is a struct - the public DensityRange property only has a getter, so
-                // calling Encapsulate through it (as this used to) mutates a throwaway copy and never
-                // reaches _densityRange. Mutate the field directly since we're inside GeoChunk itself.
-                _densityRange.Encapsulate(voxelChange.Item2.Density);
+                _mcManager.ReleaseVoxelArray(config.ChunkSize, this, true);
+
+                return hasEdits;
             }
-
-            if (hasEdits) {
-                _mcManager.PackVoxelArray(config.ChunkSize, this, true, editBounds);
-
-                // Any cached "empty" result may no longer hold once the underlying voxel data has
-                // changed - wipe the whole cache rather than figuring out which addresses actually
-                // overlap editBounds. See the field's own comment for why whole-chunk invalidation
-                // is the right tradeoff here.
-                _knownEmptyOctreeAddresses.Clear();
+            finally {
+                volumeEngine.ReleaseHeldEvents();
             }
-
-            _mcManager.ReleaseVoxelArray(config.ChunkSize, this, true);
-
-            return hasEdits;
         }
 
         public void OnVolumeMovement() {
@@ -354,6 +454,9 @@ namespace Spellbound.GeoForge {
         // sites inside GeoChunk.cs/GeoForgeManager.*.cs; if anything outside this file calls
         // GetVoxelDataArray(), it'll need a grep-and-fix pass.
         public NativeArray<VoxelData> GetVoxelDataArray(bool isEdit) {
+            if (isEdit)
+                FillIfUniform();
+
             return _mcManager.GetOrUnpackVoxelArray(ParentGeoVolume.ConfigBlob.Value.ChunkSize, this,
                 _sparseVoxels, isEdit);
         }
@@ -415,6 +518,12 @@ namespace Spellbound.GeoForge {
         }
 
         public VoxelData GetVoxelData(int index) {
+            FillIfUniform();
+
+            return ReadVoxel(index);
+        }
+
+        private VoxelData ReadVoxel(int index) {
             ref var config = ref ParentGeoVolume.ConfigBlob.Value;
 
             if (_mcManager.TryGetResidentVoxelArray(config.ChunkSize, this, out var denseVoxels))
@@ -464,7 +573,7 @@ namespace Spellbound.GeoForge {
                 config.ChunkDataWidthSize
             );
 
-            return GetVoxelData(index);
+            return ReadVoxel(index);
         }
 
         public bool HasVoxelData() {
@@ -517,7 +626,7 @@ namespace Spellbound.GeoForge {
         // would let another chunk's LRU claim on the Validation pool overwrite this array while a
         // still-pending march job on a worker thread is reading it.
         public void ScheduleOctreeLodValidation(NativeArray<ChunkViewer> viewersVoxelSpace, IChunkInterest interest) {
-            if (!_sparseVoxels.IsCreated)
+            if (!_sparseVoxels.IsCreated || IsUniform)
                 return;
 
             RootNode.ValidateOctreeLods(viewersVoxelSpace.AsReadOnlySpan(), interest, GetVoxelDataArray(false));
@@ -527,7 +636,9 @@ namespace Spellbound.GeoForge {
         // CompleteAndApplyMarchingCubesJobs() has run for whatever batch this chunk's
         // ScheduleOctreeLodValidation call was part of.
         public void ReleaseLodValidation() {
-            _mcManager.ReleaseVoxelArray(ParentGeoVolume.ConfigBlob.Value.ChunkSize, this, false);
+            if (!IsUniform)
+                _mcManager.ReleaseVoxelArray(ParentGeoVolume.ConfigBlob.Value.ChunkSize, this, false);
+
             SetMeshReady();
         }
 

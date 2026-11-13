@@ -67,6 +67,9 @@ namespace Spellbound.GeoForge {
         ///     Method for Chunk to receive a voxel edit operation.
         /// </summary>
         void PassVoxelEditOperation(VoxelEditOperation operation) {
+            if (!GeoChunkEngine.CanResolveEdits())
+                return;
+
             GeoChunkEngine.IGeoEditStore.PassVoxelEditOperation(operation);
         }
 

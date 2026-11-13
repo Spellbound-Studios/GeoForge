@@ -288,7 +288,7 @@ namespace Spellbound.GeoForge {
                 foreach (var kvp in editsByChunkCoord) {
                     var chunk = geoVolume.GetChunkByCoord(kvp.Key);
 
-                    if (chunk == null)
+                    if (chunk == null || !chunk.GeoChunkEngine.CanResolveEdits())
                         continue;
 
                     chunk.PassVoxelEditOperation(new VoxelEditOperation(materialIndex, kvp.Value, allowedMaterialsMask,
@@ -344,9 +344,9 @@ namespace Spellbound.GeoForge {
         ///     nearest-solid-corner tie-break rule.
         ///     Returns false (with materialIndex left at VoxelData.NullSentinelValue and queryVolume
         ///     left null) if no primary volume exists, none of them have a loaded chunk with voxel
-        ///     data at this position, or the resolved cell has no solid corners at all. queryVolume is
-        ///     only ever set on a true return, never left pointing at a volume whose data wasn't
-        ///     actually used.
+        ///     data at this position, the resolved cell has no solid corners at all, or its resolved
+        ///     corner holds the null material (a uniform chunk not yet filled). queryVolume is only ever
+        ///     set on a true return, never left pointing at a volume whose data wasn't actually used.
         /// </summary>
         public bool TryQuerySurfaceMaterial(Vector3 position, out byte materialIndex, out IGeoVolume queryVolume) {
             materialIndex = VoxelData.NullSentinelValue;
