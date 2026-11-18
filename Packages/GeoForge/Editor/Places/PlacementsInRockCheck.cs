@@ -10,7 +10,9 @@ using UnityEngine;
 namespace Spellbound.GeoForge.Places {
     [RegisteredDefinitionCheck(GeoForgePlacesCheckNames.PlacementsInRock, RunsWhileEditing = true)]
     public sealed class PlacementsInRockCheck : IDefinitionCheck<PlaceDefinition> {
-        private readonly float _placementBoxSize = 1.5f;
+        public const float DefaultPlacementBoxSize = 1.5f;
+
+        private readonly float _placementBoxSize = DefaultPlacementBoxSize;
         private readonly Vector3 _worldOrigin = Vector3.zero;
         private readonly float _voxelSize = 1f;
 

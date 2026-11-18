@@ -1,5 +1,6 @@
 ﻿// Copyright (c) Spellbound Studios. All rights reserved.
 
+using System;
 using UnityEditor;
 using UnityEditor.EditorTools;
 using UnityEngine;
@@ -17,12 +18,16 @@ namespace Spellbound.GeoForge.Places {
         [SerializeField] private byte material;
         [SerializeField] private float reach = DefaultReach;
 
+        private static VoxelBrush _activatedBrush;
+
         private VoxelBrush _ownedBrush;
         private VoxelBrushOverlay _overlay;
         private Vector3 _lastStrokeCentre;
         private bool _isStroking;
 
         public VoxelBrush Brush { get; set; }
+
+        public static VoxelBrush ActivatedBrush => _activatedBrush;
 
         public VoxelStrokeShape Shape {
             get => shape;
@@ -42,6 +47,23 @@ namespace Spellbound.GeoForge.Places {
         public byte Material {
             get => material;
             set => material = value;
+        }
+
+        public static void Activate(VoxelBrush brush) {
+            _activatedBrush = brush ?? throw new ArgumentNullException(nameof(brush));
+            ToolManager.SetActiveTool<VoxelBrushTool>();
+        }
+
+        public static void Release(VoxelBrush brush) {
+            if (brush == null || _activatedBrush != brush) {
+                return;
+            }
+
+            _activatedBrush = null;
+
+            if (ToolManager.activeToolType == typeof(VoxelBrushTool)) {
+                ToolManager.RestorePreviousPersistentTool();
+            }
         }
 
         public override void OnActivated() {
@@ -134,6 +156,10 @@ namespace Spellbound.GeoForge.Places {
         private VoxelBrush ResolveBrush() {
             if (Brush != null) {
                 return Brush;
+            }
+
+            if (_activatedBrush != null) {
+                return _activatedBrush;
             }
 
             if (_ownedBrush != null) {
