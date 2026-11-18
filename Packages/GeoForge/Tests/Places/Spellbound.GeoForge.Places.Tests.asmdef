@@ -1,0 +1,37 @@
+{
+  "name": "Spellbound.GeoForge.Places.Tests",
+  "rootNamespace": "Spellbound.GeoForge.Places.Tests",
+  "references": [
+    "Spellbound.GeoForge",
+    "Spellbound.GeoForge.Places",
+    "Spellbound.GeoForge.Places.Editor",
+    "Spellbound.Places",
+    "Spellbound.Core",
+    "Spellbound.GeoForge.Tests",
+    "Unity.Collections",
+    "Unity.Entities",
+    "Unity.Mathematics",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "SPELLBOUND_PLACES", "SPELLBOUND_CORE", "!UNITY_SERVER"],
+  "versionDefines": [
+    {
+      "name": "com.spellboundstudios.core",
+      "expression": "[1.1.9,3.0.0)",
+      "define": "SPELLBOUND_CORE"
+    },
+    {
+      "name": "com.spellboundstudios.places",
+      "expression": "[0.0.0,1.0.0)",
+      "define": "SPELLBOUND_PLACES"
+    }
+  ],
+  "noEngineReferences": false
+}

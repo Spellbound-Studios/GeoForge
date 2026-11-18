@@ -1,0 +1,25 @@
+{
+  "name": "Spellbound.GeoForge.Places",
+  "rootNamespace": "Spellbound.GeoForge.Places",
+  "references": ["Spellbound.GeoForge", "Spellbound.Places", "Spellbound.Core", "Unity.Collections", "Unity.Entities"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": ["SPELLBOUND_PLACES", "SPELLBOUND_CORE"],
+  "versionDefines": [
+    {
+      "name": "com.spellboundstudios.core",
+      "expression": "[1.1.9,3.0.0)",
+      "define": "SPELLBOUND_CORE"
+    },
+    {
+      "name": "com.spellboundstudios.places",
+      "expression": "[0.0.0,1.0.0)",
+      "define": "SPELLBOUND_PLACES"
+    }
+  ],
+  "noEngineReferences": false
+}

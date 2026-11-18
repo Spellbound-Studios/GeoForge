@@ -20,6 +20,8 @@ A manager takes a presenter component on its own object first, then the factory 
 
 Edits go through `GeoForgeCommands` (`RemoveSphere`, `AddSphere` and the cube and arc commands) over an `IGeoVolume`; the edit store of a chunk is an `IGeoEditStore`. Queries go through one volume, or through the manager over its primary volumes: `TryQueryVoxel` answers the voxel at a world position, `TryQuerySurfaceMaterial` the material of the cell enclosing it, `TryQuerySurfaceCase` a `SurfaceCase` (the marching cubes cell with its origin, its eight corners in the march's corner order, its case code and whether it is empty, solid or crossed by the surface) and `TryQuerySolid` the zero rule there; `IsMeshReady`, `IsColliderReady` and `IsBoxReady` answer readiness under a `VolumeVersion`, and `TryCopyRunList` and `TryCopySolidRuns` copy a chunk's runs with the version they were read at. `SurfaceCases.Compute` answers surface cases over a chunk's voxel array. A volume raises `Changed` with a `VolumeChange` after an edit and `ResidencyChanged` with a `ChunkResidency`, both after the manager has finished applying a march batch, never inside it, so a subscriber may edit terrain.
 
+The Places bridge, `Spellbound.GeoForge.Places`, stamps and captures a Place's voxel layer: `GeoForgePlacesKit.Stamp` and `GeoForgePlacesKit.Capture` take the volume and the region, and a `VoxelLayerOwner` built over a volume and a region goes to `PlacesKit.Stamp` through Places' explicit owner registry; the parameterless `VoxelLayerOwner` that Places registers holds no volume and reports `VolumeMissing`.
+
 <!-- spellbound:samples 34c4396d -->
 Samples in `Samples~`, imported from the Package Manager's Samples tab:
 - Supplimentary Assets: Additional Assets, including the Shadergraph from which the Material Shader was generated (`Samples~/SupplementaryAssets`)
@@ -29,7 +31,7 @@ Samples in `Samples~`, imported from the Package Manager's Samples tab:
 - Networked Digging a Hole: Networked Version of the Digging a Hole sample scene. (`Samples~/NetworkedSample`)
 <!-- /spellbound:samples -->
 
-<!-- spellbound:depends c8e6687f -->
+<!-- spellbound:depends fb1cdefa -->
 Depends on:
 - `com.spellboundstudios.core` in [1.1.9,3.0.0)
 - `com.unity.entities` 1.3.15
@@ -39,14 +41,41 @@ Depends on:
 - `com.unity.collections` 2.5.7
 - `com.unity.modules.physics` 1.0.0
 Bridges, each compiled only when its package is installed:
+- `Spellbound.GeoForge.Places.Editor` when `com.spellboundstudios.places` is in [0.0.0,1.0.0)
 - `Spellbound.GeoForge.Networking` when `com.spellboundstudios.networking` is in [0.0.0,2.0.0)
+- `Spellbound.GeoForge.Places` when `com.spellboundstudios.places` is in [0.0.0,1.0.0)
 <!-- /spellbound:depends -->
 
-<!-- spellbound:doors e3bd200c -->
+<!-- spellbound:doors 5a98f3ac -->
 Bridge doors in this project, the constructors of the types a bridge assembly adds:
 - `GeoForgeNetworkingKit` in `Spellbound.GeoForge.Networking`
   - `static VoxelEditStores CreateEditStores(IGeoVolume volume, ref VoxelEditSourceSettings settings, ObservationContext observations)`
+- `GeoForgePlacesKit` in `Spellbound.GeoForge.Places`
+  - `static VoxelLayer Capture(IGeoVolume volume, VoxelRegion region, string layerName, ValidationReport report)`
+  - `static bool Stamp(PlaceDefinition place, IGeoVolume volume, VoxelRegion region, ValidationReport report)`
 <!-- /spellbound:doors -->
+
+<!-- spellbound:operations 2e6e2718 -->
+com.spellboundstudios.geoforge
+Operations of the group `geoforge`, run as `<group> <operation> [arguments]`:
+- `geoforge bake --target <place-definition> --generator <geo-forge-data-generator> --config <voxel-volume-config> [--layer-name <text> = voxels] [--seed <integer> = 0]`: Fills a voxel layer of a place from a GeoForge density source over the layer's region and writes a report beside the asset. [writes, developer]
+  - `--target`: The place, as asset:<path> or asset:<name>.
+  - `--generator`: The data generator asset the density is read from.
+  - `--config`: The voxel volume config asset giving chunk size and voxel size.
+  - `--layer-name`: The voxel layer's name; added when absent. Default: voxels.
+  - `--seed`: The seed given to the density source. Default: 0.
+- `geoforge capture --target <place-definition> [--layer-name <text> = voxels] [--chunk-x <integer> = 0] [--chunk-y <integer> = 0] [--chunk-z <integer> = 0] [--extent <integer> = 1]`: Captures a region of the open scene's GeoForge volume into a voxel layer of a place. [writes, developer]
+  - `--target`: The place, as asset:<path> or asset:<name>.
+  - `--layer-name`: The voxel layer's name; added when absent. Default: voxels.
+  - `--chunk-x`: The region's minimum chunk on x. Default: 0.
+  - `--chunk-y`: The region's minimum chunk on y. Default: 0.
+  - `--chunk-z`: The region's minimum chunk on z. Default: 0.
+  - `--extent`: Chunks per axis of the region. Default: 1.
+<!-- /spellbound:operations -->
+
+<!-- spellbound:pipeline 85aca405 -->
+Agents run these operation lines from the Unity command line when `com.unity.pipeline` is installed in [0.8.0-exp.1,0.9.0-exp.1) or [0.9.0-exp.1,0.10.0-exp.1) or [0.10.0-exp.1,0.11.0-exp.1): find the command with `unity command --query spellbound` and pass it one line.
+<!-- /spellbound:pipeline -->
 
 ## Rules
 
