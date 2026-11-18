@@ -1,7 +1,6 @@
 // Copyright (c) Spellbound Studios. All rights reserved.
 
 using System.Collections;
-using System.Reflection;
 using UnityEngine;
 
 namespace Spellbound.GeoForge.Tests {
@@ -9,8 +8,7 @@ namespace Spellbound.GeoForge.Tests {
         public void Build(VoxelVolumeConfig config, GameObject chunkPrefab, BoundaryOverrides boundaryOverrides) {
             Config = config;
             BoundaryOverrides = boundaryOverrides;
-            typeof(GeoVolume).GetProperty("ChunkPrefab", BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(this, chunkPrefab);
+            ChunkPrefab = chunkPrefab;
             CreateGeoVolume(config);
         }
 

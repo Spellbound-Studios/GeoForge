@@ -8,7 +8,7 @@ Turns a density field into meshes: octree chunks, marching cubes with Transvoxel
 
 `GeoForgeKit` is the front door. `CreateDensitySource` wraps a `GeoForgeDataGenerator` asset as an `IDensitySource`, and four doors march with no manager, octree or play mode: `Generate` fills one chunk's voxels from a density source, `March` marches them at one level of detail into a `MarchOutput`, `BuildMesh` makes a `Mesh` from that output and `Bake` bakes the mesh for a collider. `VoxelEncoding` is the one place the density and material rules live (the zero rule `IsSolid`, the material encoding with its mature bit, and the null sentinel); `ChunkLayout` gives the data width, voxel index, chunk origin and chunk coordinate.
 
-In a scene a consumer places a `GeoForgeManager` and one or more `GeoVolume`s. The manager is an instance, not a singleton: a volume names its manager in its `manager` field, or finds the one on a parent, and two managers are two worlds that share nothing.
+In a scene a consumer places a `GeoForgeManager` and one or more `GeoVolume`s. The manager is an instance, not a singleton: a volume names its manager in its `manager` field, or finds the one on a parent, and two managers are two worlds that share nothing. In edit mode `ScratchVolume`, in the editor assembly, opens a temporary scene with a manager and one finite volume over a config and a chunk extent, built at once through `GeoVolume.Build`, ticked through `GeoForgeManager.Tick` from the editor's update, drawn by the default presenters it sets by code, finished by `Complete` and closed by `Dispose`.
 
 Four seams, each with a default:
 - `IDensitySource` fills a chunk's voxels; `IGeoVolume.UseDensitySource` sets it, and the default wraps the volume's generator asset.
@@ -96,7 +96,6 @@ The binding rules are the line text at https://github.com/Spellbound-Studios/.gi
 
 ## Gaps
 
-- The default presenters register on entering play mode (`RuntimeInitializeOnLoadMethod`), so a manager driven in edit mode has no default presenter until one is set by code or added as a component.
 - The volume configuration and the marching tables are still blob assets, and the three data factories stay beside the seam that replaces them, until GeoForge Pro leaves the manifests that compile against them.
 - No operation group yet: `core help` lists nothing for GeoForge, and the old console command `TerraformHelpCommand` stays until the old console leaves Core.
 - No `Surface.txt` yet.

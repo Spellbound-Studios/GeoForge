@@ -70,6 +70,9 @@ namespace Spellbound.GeoForge {
         public event Action<ChunkResidency> ResidencyChanged;
 
         public void Dispose() {
+            if (_isDisposed)
+                return;
+
             _isDisposed = true;
 
             var chunkList = new List<IGeoChunk>(ChunkDict.Values);
@@ -81,7 +84,7 @@ namespace Spellbound.GeoForge {
                 // here in the middle of this loop, which is the risky ordering this exit criterion
                 // calls out. GeoChunk.Dispose() is now idempotent by design (see its own guard),
                 // so whichever order the deferred OnDestroy fires in, it's safe either way.
-                Object.Destroy(chunk.GeoChunkEngine.Transform.gameObject);
+                DestroyChunkObject(chunk.GeoChunkEngine.Transform.gameObject);
             }
 
             if (Manager != null)
@@ -99,6 +102,13 @@ namespace Spellbound.GeoForge {
 
         public void UseDensitySource(IDensitySource source) {
             _densitySource = source;
+        }
+
+        internal static void DestroyChunkObject(GameObject chunkObject) {
+            if (Application.isPlaying)
+                Object.Destroy(chunkObject);
+            else
+                Object.DestroyImmediate(chunkObject);
         }
 
         internal IDensitySource DensitySourceFor(GeoForgeDataGenerator generator) {
@@ -787,13 +797,8 @@ namespace Spellbound.GeoForge {
             var viewersVoxelSpace = default(NativeArray<ChunkViewer>);
 
             foreach (var coord in chunkList) {
-                if (!ChunkDict.TryGetValue(coord, out var chunk))
+                if (!ChunkDict.TryGetValue(coord, out var chunk) || !NeedsValidation(chunk))
                     continue;
-
-                if (!chunk.HasVoxelData())
-                    continue;
-
-                if (chunk.DensityRange.IsSkippable()) continue;
 
                 if (scheduledChunks.Count == 0 && !TryConvertViewers(out viewersVoxelSpace))
                     return;
@@ -819,6 +824,51 @@ namespace Spellbound.GeoForge {
             // Flush a partial final batch that never reached validatesPerFrame.
             if (scheduledChunks.Count > 0)
                 CompleteValidationBatch(scheduledChunks);
+        }
+
+        public void ValidateChunkLods() {
+            if (Manager == null || _isDisposed)
+                return;
+
+            var validatesPerFrame = ConfigBlob.Value.ValidatesPerFrame;
+            var scheduledChunks = new List<IGeoChunk>(validatesPerFrame);
+            var viewersVoxelSpace = default(NativeArray<ChunkViewer>);
+
+            foreach (var chunk in ChunkDict.Values.ToList()) {
+                if (!NeedsValidation(chunk))
+                    continue;
+
+                if (scheduledChunks.Count == 0 && !TryConvertViewers(out viewersVoxelSpace))
+                    return;
+
+                ScheduleValidation(chunk, viewersVoxelSpace);
+                scheduledChunks.Add(chunk);
+
+                if (scheduledChunks.Count < validatesPerFrame)
+                    continue;
+
+                CompleteValidationBatch(scheduledChunks);
+                scheduledChunks.Clear();
+            }
+
+            if (scheduledChunks.Count > 0)
+                CompleteValidationBatch(scheduledChunks);
+        }
+
+        internal bool HasChunksAwaitingMesh() {
+            if (_isDisposed)
+                return false;
+
+            foreach (var chunk in ChunkDict.Values) {
+                if (NeedsValidation(chunk) && !chunk.MeshReady)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool NeedsValidation(IGeoChunk chunk) {
+            return chunk.HasVoxelData() && !chunk.DensityRange.IsSkippable();
         }
 
         // Gathers every chunk's edits (via IGeoEditStore.ReadAllEdits, the interface's generic
