@@ -7,5 +7,7 @@ namespace Spellbound.GeoForge.Places {
         public const string RunOutOfRange = "geoforge.run-out-of-range";
         public const string VolumeMissing = "geoforge.volume-missing";
         public const string ChunkNotLoaded = "geoforge.chunk-not-loaded";
+        public const string InsideRock = "geoforge.inside-rock";
+        public const string VoxelLayerInReferenceFrame = "geoforge.voxel-layer-in-reference-frame";
     }
 }
