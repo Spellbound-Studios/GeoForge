@@ -20,6 +20,8 @@ A manager takes a presenter component on its own object first, then the factory 
 
 Edits go through `GeoForgeCommands` (`RemoveSphere`, `AddSphere` and the cube and arc commands) over an `IGeoVolume`; the edit store of a chunk is an `IGeoEditStore`. Queries go through one volume, or through the manager over its primary volumes: `TryQueryVoxel` answers the voxel at a world position, `TryQuerySurfaceMaterial` the material of the cell enclosing it, `TryQuerySurfaceCase` a `SurfaceCase` (the marching cubes cell with its origin, its eight corners in the march's corner order, its case code and whether it is empty, solid or crossed by the surface) and `TryQuerySolid` the zero rule there; `IsMeshReady`, `IsColliderReady` and `IsBoxReady` answer readiness under a `VolumeVersion`, and `TryCopyRunList` and `TryCopySolidRuns` copy a chunk's runs with the version they were read at. `SurfaceCases.Compute` answers surface cases over a chunk's voxel array. A volume raises `Changed` with a `VolumeChange` after an edit and `ResidencyChanged` with a `ChunkResidency`, both after the manager has finished applying a march batch, never inside it, so a subscriber may edit terrain.
 
+The Places bridge, `Spellbound.GeoForge.Places`, stamps and captures a Place's voxel layer: `GeoForgePlacesKit.Stamp` and `GeoForgePlacesKit.Capture` take the volume and the region, and a `VoxelLayerOwner` built over a volume and a region goes to `PlacesKit.Stamp` through Places' explicit owner registry; the parameterless `VoxelLayerOwner` that Places registers holds no volume and reports `VolumeMissing`.
+
 <!-- spellbound:samples 34c4396d -->
 Samples in `Samples~`, imported from the Package Manager's Samples tab:
 - Supplimentary Assets: Additional Assets, including the Shadergraph from which the Material Shader was generated (`Samples~/SupplementaryAssets`)
@@ -44,10 +46,13 @@ Bridges, each compiled only when its package is installed:
 - `Spellbound.GeoForge.Places` when `com.spellboundstudios.places` is in [0.0.0,1.0.0)
 <!-- /spellbound:depends -->
 
-<!-- spellbound:doors e3bd200c -->
+<!-- spellbound:doors 5a98f3ac -->
 Bridge doors in this project, the constructors of the types a bridge assembly adds:
 - `GeoForgeNetworkingKit` in `Spellbound.GeoForge.Networking`
   - `static VoxelEditStores CreateEditStores(IGeoVolume volume, ref VoxelEditSourceSettings settings, ObservationContext observations)`
+- `GeoForgePlacesKit` in `Spellbound.GeoForge.Places`
+  - `static VoxelLayer Capture(IGeoVolume volume, VoxelRegion region, string layerName, ValidationReport report)`
+  - `static bool Stamp(PlaceDefinition place, IGeoVolume volume, VoxelRegion region, ValidationReport report)`
 <!-- /spellbound:doors -->
 
 <!-- spellbound:operations af92e7d2 -->

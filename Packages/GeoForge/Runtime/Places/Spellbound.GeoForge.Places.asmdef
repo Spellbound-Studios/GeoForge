@@ -1,7 +1,7 @@
 {
   "name": "Spellbound.GeoForge.Places",
   "rootNamespace": "Spellbound.GeoForge.Places",
-  "references": ["Spellbound.GeoForge", "Spellbound.Places", "Spellbound.Core"],
+  "references": ["Spellbound.GeoForge", "Spellbound.Places", "Spellbound.Core", "Unity.Collections", "Unity.Entities"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

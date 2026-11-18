@@ -9,6 +9,7 @@ using UnityEngine;
 namespace PlacesConversion.Tests {
     public sealed class ConvertedPlaceTests {
         private const string ConvertedPlacePath = "Assets/_Project/PlacesConversion/MainShaftBottomV2.asset";
+        private const string ConvertedRunsPath = "Assets/_Project/PlacesConversion/MainShaftBottomV2Runs.asset";
         private const int CaptureRunCount = 124718;
         private const int CaptureDataWidth = 67;
 
@@ -30,6 +31,9 @@ namespace PlacesConversion.Tests {
 
             Assert.IsNotNull(layer);
             Assert.AreEqual("voxels", layer.LayerName);
+            Assert.IsNotNull(layer.Store);
+            Assert.AreEqual(ConvertedRunsPath, AssetDatabase.GetAssetPath(layer.Store));
+            Assert.AreEqual(ConvertedRunsPath, CaptureTextConverter.RunStorePath(ConvertedPlacePath));
             Assert.AreEqual(64, layer.ChunkSize);
             Assert.AreEqual(Vector3Int.one, layer.ChunkExtent);
             Assert.AreEqual(CaptureDataWidth, layer.DataWidth);

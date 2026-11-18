@@ -12,12 +12,15 @@ namespace Spellbound.GeoForge.Places {
         [SerializeField] private int chunkSize = 64;
         [SerializeField] private Vector3Int chunkExtent = Vector3Int.one;
         [SerializeField] private List<VoxelLayerChunk> chunks = new();
+        [SerializeField] private VoxelRunStore store;
 
         public int ChunkSize => chunkSize;
 
         public Vector3Int ChunkExtent => chunkExtent;
 
-        public IReadOnlyList<VoxelLayerChunk> Chunks => chunks;
+        public IReadOnlyList<VoxelLayerChunk> Chunks => store != null ? store.Chunks : chunks;
+
+        public VoxelRunStore Store => store;
 
         public int DataWidth => ChunkLayout.DataWidth(chunkSize);
 
@@ -40,12 +43,24 @@ namespace Spellbound.GeoForge.Places {
             this.chunkSize = chunkSize;
             this.chunkExtent = chunkExtent;
             this.chunks = new List<VoxelLayerChunk>(chunks);
+            store = null;
+        }
+
+        public void UseStore(VoxelRunStore store) {
+            if (store == null) {
+                throw new ArgumentNullException(nameof(store));
+            }
+
+            this.store = store;
+            chunks = new List<VoxelLayerChunk>();
         }
 
         public override void Validate(ValidationReport report, string location) {
             if (report == null) {
                 throw new ArgumentNullException(nameof(report));
             }
+
+            var chunks = Chunks;
 
             if (chunks.Count == 0) {
                 report.Error(GeoForgePlacesFindingCodes.VoxelLayerEmpty,

@@ -28,12 +28,21 @@ namespace PlacesConversion {
 
             layer.SetChunks(CaptureText.CaptureChunkSize, Vector3Int.one, new[] { chunk });
 
+            var store = ScriptableObject.CreateInstance<VoxelRunStore>();
+            store.SetChunks(layer.Chunks);
+            AssetDatabase.CreateAsset(store, RunStorePath(placeAssetPath));
+            layer.UseStore(store);
+
             var place = ScriptableObject.CreateInstance<PlaceDefinition>();
             place.AddLayer(layer);
 
             AssetDatabase.CreateAsset(place, placeAssetPath);
             AssetDatabase.SaveAssets();
             return place;
+        }
+
+        public static string RunStorePath(string placeAssetPath) {
+            return Path.ChangeExtension(placeAssetPath, null) + "Runs.asset";
         }
     }
 }
