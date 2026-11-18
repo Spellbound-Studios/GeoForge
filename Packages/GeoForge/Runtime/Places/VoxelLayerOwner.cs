@@ -32,6 +32,13 @@ namespace Spellbound.GeoForge.Places {
                 throw new ArgumentNullException(nameof(context));
             }
 
+            if (!context.Frame.IsWorld) {
+                context.Report.Error(GeoForgePlacesFindingCodes.VoxelLayerInReferenceFrame,
+                    "voxel layer '" + layer.LayerName + "' is not stamped: the stamp names reference frame "
+                    + context.Frame + ", and a GeoForge volume is in the world reference frame", layer.LayerName);
+                return;
+            }
+
             var engine = ResolveEngine();
 
             if (engine == null) {
