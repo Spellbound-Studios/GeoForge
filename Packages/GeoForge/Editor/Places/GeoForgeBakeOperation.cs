@@ -20,7 +20,7 @@ namespace Spellbound.GeoForge.Places {
             [Argument("The voxel layer's name; added when absent.")] string layerName = "voxels",
             [Argument("The seed given to the density source.")] int seed = 0) {
             if (string.IsNullOrWhiteSpace(layerName)) {
-                return OperationResult.Invalid("--layer-name is not blank");
+                return OperationResult.Invalid("--layer-name is blank");
             }
 
             var found = target.FindLayer(layerName);
@@ -34,9 +34,11 @@ namespace Spellbound.GeoForge.Places {
                 ? new VoxelRegion(Vector3Int.zero, foundLayer.ChunkExtent)
                 : VoxelRegion.Origin;
             VoxelLayer baked;
+            float voxelSize;
 
             try {
-                baked = VoxelLayerBaker.Bake(generator, config, region, layerName, unchecked((uint)seed));
+                baked = VoxelLayerBaker.Bake(generator, config, region, layerName, unchecked((uint)seed),
+                    out voxelSize);
             } catch (ArgumentException exception) {
                 return OperationResult.Invalid(exception.Message);
             }
@@ -50,19 +52,12 @@ namespace Spellbound.GeoForge.Places {
                     + " runs to layer " + layerName + " of " + assetPath + " and its report");
             }
 
-            var written = baked;
-
-            if (found is VoxelLayer existing) {
-                existing.SetChunks(baked.ChunkSize, baked.ChunkExtent, baked.Chunks);
-                written = existing;
-            } else {
-                target.AddLayer(baked);
-            }
+            var written = VoxelRunStores.Write(target, found as VoxelLayer, baked);
 
             EditorUtility.SetDirty(target);
             AssetDatabase.SaveAssets();
             var reportPath = BakeReport.Write(assetPath,
-                BakeReport.Lines(target, written, generator, config, VoxelLayerBaker.VoxelSize(config)));
+                BakeReport.Lines(target, written, generator, config, voxelSize));
 
             return OperationResult.Success("layer " + layerName + ": " + chunkCount + " chunks, " + runCount
                 + " runs; report " + reportPath);

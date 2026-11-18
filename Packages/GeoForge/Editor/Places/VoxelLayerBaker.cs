@@ -8,7 +8,7 @@ using Unity.Jobs;
 namespace Spellbound.GeoForge.Places {
     public static class VoxelLayerBaker {
         public static VoxelLayer Bake(GeoForgeDataGenerator generator, VoxelVolumeConfig config, VoxelRegion region,
-            string layerName, uint seed) {
+            string layerName, uint seed, out float voxelSize) {
             if (generator == null) {
                 throw new ArgumentNullException(nameof(generator));
             }
@@ -22,7 +22,7 @@ namespace Spellbound.GeoForge.Places {
             try {
                 var chunkSize = blob.Value.ChunkSize;
                 var dataWidth = blob.Value.ChunkDataWidthSize;
-                var voxelSize = blob.Value.Resolution;
+                voxelSize = blob.Value.Resolution;
 
                 if (chunkSize < 1) {
                     throw new ArgumentException("voxel config " + config.name + " has no chunk size", nameof(config));
@@ -46,26 +46,16 @@ namespace Spellbound.GeoForge.Places {
             }
         }
 
-        public static float VoxelSize(VoxelVolumeConfig config) {
-            if (config == null) {
-                throw new ArgumentNullException(nameof(config));
-            }
-
-            var blob = VolumeConfigBlobCreator.CreateVolumeConfigBlobAsset(config);
-
-            try {
-                return blob.Value.Resolution;
-            } finally {
-                blob.Dispose();
-            }
-        }
-
         private static SparseVoxelData[] Compress(IDensitySource source, in ChunkFillRequest request) {
-            var voxels = GeoForgeKit.Generate(source, in request, Allocator.TempJob);
-            var runs = new NativeList<SparseVoxelData>(Allocator.TempJob);
-            var densityRange = new NativeArray<DensityRange>(1, Allocator.TempJob);
+            NativeArray<VoxelData> voxels = default;
+            NativeList<SparseVoxelData> runs = default;
+            NativeArray<DensityRange> densityRange = default;
 
             try {
+                voxels = GeoForgeKit.Generate(source, in request, Allocator.TempJob);
+                runs = new NativeList<SparseVoxelData>(Allocator.TempJob);
+                densityRange = new NativeArray<DensityRange>(1, Allocator.TempJob);
+
                 new DenseToSparseVoxelDataJob {
                     Voxels = voxels,
                     SparseVoxels = runs,
@@ -74,9 +64,17 @@ namespace Spellbound.GeoForge.Places {
 
                 return runs.AsArray().ToArray();
             } finally {
-                densityRange.Dispose();
-                runs.Dispose();
-                voxels.Dispose();
+                if (densityRange.IsCreated) {
+                    densityRange.Dispose();
+                }
+
+                if (runs.IsCreated) {
+                    runs.Dispose();
+                }
+
+                if (voxels.IsCreated) {
+                    voxels.Dispose();
+                }
             }
         }
     }

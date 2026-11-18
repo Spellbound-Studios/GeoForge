@@ -23,6 +23,15 @@ namespace Spellbound.GeoForge.Places.Tests {
         }
 
         [Test]
+        public void SetChunksRefusesANullChunk() {
+            var layer = new VoxelLayer { LayerName = "voxels" };
+
+            Assert.Throws<ArgumentException>(() =>
+                layer.SetChunks(64, Vector3Int.one, new VoxelLayerChunk[] { null }));
+            Assert.AreEqual(0, layer.Chunks.Count);
+        }
+
+        [Test]
         public void AVoxelLayerSurvivesASaveAndAForcedReimport() {
             var path = _folder.Path("VoxelPlace.asset");
             var runs = new[] {

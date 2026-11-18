@@ -40,10 +40,21 @@ namespace Spellbound.GeoForge.Places {
                     "A layer is at least one chunk along each axis.");
             }
 
+            foreach (var chunk in chunks) {
+                if (chunk == null) {
+                    throw new ArgumentException("A chunk list holds no null chunk.", nameof(chunks));
+                }
+            }
+
             this.chunkSize = chunkSize;
             this.chunkExtent = chunkExtent;
-            this.chunks = new List<VoxelLayerChunk>(chunks);
-            store = null;
+
+            if (store != null) {
+                store.SetChunks(chunks);
+                this.chunks = new List<VoxelLayerChunk>();
+            } else {
+                this.chunks = new List<VoxelLayerChunk>(chunks);
+            }
         }
 
         public void UseStore(VoxelRunStore store) {
@@ -60,9 +71,9 @@ namespace Spellbound.GeoForge.Places {
                 throw new ArgumentNullException(nameof(report));
             }
 
-            var chunks = Chunks;
+            var heldChunks = Chunks;
 
-            if (chunks.Count == 0) {
+            if (heldChunks.Count == 0) {
                 report.Error(GeoForgePlacesFindingCodes.VoxelLayerEmpty,
                     "voxel layer '" + LayerName + "' holds no chunks", location);
                 return;
@@ -70,16 +81,16 @@ namespace Spellbound.GeoForge.Places {
 
             var expectedChunks = chunkExtent.x * chunkExtent.y * chunkExtent.z;
 
-            if (chunks.Count != expectedChunks) {
+            if (heldChunks.Count != expectedChunks) {
                 report.Error(GeoForgePlacesFindingCodes.VoxelLayerChunksMismatch,
-                    "voxel layer '" + LayerName + "' holds " + chunks.Count + " chunks where its extent "
+                    "voxel layer '" + LayerName + "' holds " + heldChunks.Count + " chunks where its extent "
                     + chunkExtent + " needs " + expectedChunks, location);
             }
 
             var dataVolume = ChunkDataVolume;
 
-            for (var chunkIndex = 0; chunkIndex < chunks.Count; chunkIndex++) {
-                var chunk = chunks[chunkIndex];
+            for (var chunkIndex = 0; chunkIndex < heldChunks.Count; chunkIndex++) {
+                var chunk = heldChunks[chunkIndex];
 
                 if (chunk == null) {
                     continue;

@@ -120,30 +120,36 @@ namespace Spellbound.GeoForge.Places {
                     }
                 }
 
-                for (var a = first; a <= last; a++) {
-                    for (var b = first; b <= last; b++) {
+                for (var rowCoordinate = first; rowCoordinate <= last; rowCoordinate++) {
+                    for (var columnCoordinate = first; columnCoordinate <= last; columnCoordinate++) {
                         if (offset.x == extent.x - 1) {
-                            CountFace(East, IsEmpty(voxels, last, a, b, width), open, faceTotal);
+                            CountFace(East, IsEmpty(voxels, last, rowCoordinate, columnCoordinate, width),
+                                open, faceTotal);
                         }
 
                         if (offset.x == 0) {
-                            CountFace(West, IsEmpty(voxels, first, a, b, width), open, faceTotal);
+                            CountFace(West, IsEmpty(voxels, first, rowCoordinate, columnCoordinate, width),
+                                open, faceTotal);
                         }
 
                         if (offset.y == extent.y - 1) {
-                            CountFace(Up, IsEmpty(voxels, a, last, b, width), open, faceTotal);
+                            CountFace(Up, IsEmpty(voxels, rowCoordinate, last, columnCoordinate, width),
+                                open, faceTotal);
                         }
 
                         if (offset.y == 0) {
-                            CountFace(Down, IsEmpty(voxels, a, first, b, width), open, faceTotal);
+                            CountFace(Down, IsEmpty(voxels, rowCoordinate, first, columnCoordinate, width),
+                                open, faceTotal);
                         }
 
                         if (offset.z == extent.z - 1) {
-                            CountFace(North, IsEmpty(voxels, a, b, last, width), open, faceTotal);
+                            CountFace(North, IsEmpty(voxels, rowCoordinate, columnCoordinate, last, width),
+                                open, faceTotal);
                         }
 
                         if (offset.z == 0) {
-                            CountFace(South, IsEmpty(voxels, a, b, first, width), open, faceTotal);
+                            CountFace(South, IsEmpty(voxels, rowCoordinate, columnCoordinate, first, width),
+                                open, faceTotal);
                         }
                     }
                 }

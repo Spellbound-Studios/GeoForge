@@ -1,5 +1,6 @@
 ﻿// Copyright (c) Spellbound Studios. All rights reserved.
 
+using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using Spellbound.Core;
@@ -14,6 +15,7 @@ using UnityEngine;
 namespace Spellbound.GeoForge.Places.Tests {
     public class GeoForgeCaptureOperationTests {
         private const float SurfaceHeight = 20f;
+        private const float RaisedSurfaceHeight = 40f;
         private const string LayerName = "voxels";
 
         private GeoForgePlacesTestFolder _folder;
@@ -62,13 +64,52 @@ namespace Spellbound.GeoForge.Places.Tests {
             var first = Run(line);
             Assert.IsTrue(first.Succeeded, first.Text);
             var firstLayer = created.Place.Layers[0];
+            var firstStarts = StartIndices((VoxelLayer)firstLayer);
+            _world.Dispose();
+            _world = new BridgeTestWorld(RaisedSurfaceHeight, Vector3Int.zero);
             var second = Run(line);
 
             Assert.IsTrue(second.Succeeded, second.Text);
             Assert.AreEqual(1, created.Place.Layers.Count);
             Assert.AreSame(firstLayer, created.Place.Layers[0]);
             Assert.IsInstanceOf<VoxelLayer>(created.Place.Layers[0]);
-            Assert.AreEqual(1, ((VoxelLayer)created.Place.Layers[0]).Chunks.Count);
+            var secondLayer = (VoxelLayer)created.Place.Layers[0];
+            Assert.AreEqual(1, secondLayer.Chunks.Count);
+            CollectionAssert.AreNotEqual(firstStarts, StartIndices(secondLayer));
+        }
+
+        [Test]
+        public void ACaptureIntoALayerReadingAStoreWritesTheStore() {
+            _world = new BridgeTestWorld(SurfaceHeight, Vector3Int.zero);
+            var storePath = _folder.Path("StoredRuns.asset");
+            var store = VoxelRunStoreTests.CreateStore(storePath);
+            var layer = VoxelLayerOwnerRoundTripTests.CreateLayer(Vector3Int.one, store.Chunks[0]);
+            layer.UseStore(store);
+            var path = CreatePlace("Stored", layer).Path;
+
+            var result = Run("geoforge capture --target asset:" + path + " --layer-name " + LayerName);
+
+            Assert.IsTrue(result.Succeeded, result.Text);
+            Assert.AreEqual(storePath, AssetDatabase.GetAssetPath(Reload(path).Store));
+            StringAssert.DoesNotContain("startIndex", File.ReadAllText(path));
+            StringAssert.Contains("startIndex", File.ReadAllText(storePath));
+            var storedRuns = AssetDatabase.LoadAssetAtPath<VoxelRunStore>(storePath).Chunks[0].Runs.Count;
+            Assert.AreEqual(_world.RunsOf(Vector3Int.zero).Count, storedRuns);
+            StringAssert.Contains(storedRuns + " runs", result.Text);
+        }
+
+        [Test]
+        public void ACaptureIntoANewLayerMakesAStoreBesideThePlace() {
+            _world = new BridgeTestWorld(SurfaceHeight, Vector3Int.zero);
+            var path = CreatePlace("Fresh").Path;
+            var storePath = VoxelRunStores.PathBeside(path, LayerName);
+
+            var result = Run("geoforge capture --target asset:" + path + " --layer-name " + LayerName);
+
+            Assert.IsTrue(result.Succeeded, result.Text);
+            Assert.IsTrue(File.Exists(storePath), storePath);
+            Assert.AreEqual(storePath, AssetDatabase.GetAssetPath(Reload(path).Store));
+            StringAssert.DoesNotContain("startIndex", File.ReadAllText(path));
         }
 
         [Test]
@@ -83,6 +124,7 @@ namespace Spellbound.GeoForge.Places.Tests {
             StringAssert.StartsWith("previewed:", result.Text);
             CollectionAssert.AreEqual(bytesBefore, File.ReadAllBytes(created.Path));
             Assert.AreEqual(0, created.Place.Layers.Count);
+            Assert.IsFalse(File.Exists(VoxelRunStores.PathBeside(created.Path, LayerName)));
         }
 
         [Test]
@@ -123,6 +165,22 @@ namespace Spellbound.GeoForge.Places.Tests {
             AssetDatabase.SaveAssets();
 
             return (place, path);
+        }
+
+        private static VoxelLayer Reload(string path) {
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+
+            return AssetDatabase.LoadAssetAtPath<PlaceDefinition>(path).FindLayer(LayerName) as VoxelLayer;
+        }
+
+        private static List<int> StartIndices(VoxelLayer layer) {
+            var starts = new List<int>();
+
+            foreach (var run in layer.Chunks[0].Runs) {
+                starts.Add(run.StartIndex);
+            }
+
+            return starts;
         }
 
         private static OperationResult Run(string line) {

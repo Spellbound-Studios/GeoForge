@@ -65,6 +65,40 @@ namespace Spellbound.GeoForge.Places.Tests {
             StringAssert.StartsWith("previewed:", result.Text);
             CollectionAssert.AreEqual(bytesBefore, File.ReadAllBytes(path));
             Assert.IsFalse(File.Exists(ReportPath(path)));
+            Assert.IsFalse(File.Exists(VoxelRunStores.PathBeside(path, LayerName)));
+        }
+
+        [Test]
+        public void ABakeOverALayerReadingAStoreWritesTheStore() {
+            var storePath = _folder.Path("StoredRuns.asset");
+            var store = VoxelRunStoreTests.CreateStore(storePath);
+            var layer = VoxelLayerOwnerRoundTripTests.CreateLayer(Vector3Int.one, store.Chunks[0]);
+            layer.UseStore(store);
+            var path = CreatePlace("Stored", layer);
+
+            var result = Run(BakeLine(path));
+
+            Assert.IsTrue(result.Succeeded, result.Text);
+            Assert.AreEqual(storePath, AssetDatabase.GetAssetPath(Reload(path).Store));
+            StringAssert.DoesNotContain("startIndex", File.ReadAllText(path));
+            StringAssert.Contains("startIndex", File.ReadAllText(storePath));
+            var storedRuns = AssetDatabase.LoadAssetAtPath<VoxelRunStore>(storePath).Chunks[0].Runs.Count;
+            StringAssert.Contains(storedRuns + " runs", result.Text);
+            CollectionAssert.Contains(File.ReadAllLines(ReportPath(path)), "runs: " + storedRuns);
+        }
+
+        [Test]
+        public void ABakeIntoANewLayerMakesAStoreBesideThePlace() {
+            var path = CreatePlace("Fresh");
+            var storePath = VoxelRunStores.PathBeside(path, LayerName);
+
+            var result = Run(BakeLine(path));
+
+            Assert.IsTrue(result.Succeeded, result.Text);
+            Assert.IsTrue(File.Exists(storePath), storePath);
+            Assert.AreEqual(storePath, AssetDatabase.GetAssetPath(Reload(path).Store));
+            StringAssert.DoesNotContain("startIndex", File.ReadAllText(path));
+            Assert.IsTrue(File.Exists(ReportPath(path)));
         }
 
         [Test]
@@ -135,6 +169,12 @@ namespace Spellbound.GeoForge.Places.Tests {
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             return config;
+        }
+
+        private static VoxelLayer Reload(string path) {
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+
+            return AssetDatabase.LoadAssetAtPath<PlaceDefinition>(path).FindLayer(LayerName) as VoxelLayer;
         }
 
         private static string ReportPath(string placePath) {

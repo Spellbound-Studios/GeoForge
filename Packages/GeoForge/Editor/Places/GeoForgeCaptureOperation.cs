@@ -22,11 +22,12 @@ namespace Spellbound.GeoForge.Places {
             [Argument("The region's minimum chunk on z.")] int chunkZ = 0,
             [Argument("Chunks per axis of the region.")] int extent = 1) {
             if (string.IsNullOrWhiteSpace(layerName)) {
-                return OperationResult.Invalid("--layer-name is not blank");
+                return OperationResult.Invalid("--layer-name is blank");
             }
 
             if (extent < 1) {
-                return OperationResult.Invalid("--extent is one or more");
+                return OperationResult.Invalid("--extent is " + extent.ToString(CultureInfo.InvariantCulture)
+                    + ", one or more is required");
             }
 
             var volume = SceneVolumes.FirstWithEngine();
@@ -60,12 +61,7 @@ namespace Spellbound.GeoForge.Places {
                     + " runs to layer " + layerName + " of " + assetPath);
             }
 
-            if (found is VoxelLayer existing) {
-                existing.SetChunks(captured.ChunkSize, captured.ChunkExtent, captured.Chunks);
-            }
-            else {
-                target.AddLayer(captured);
-            }
+            VoxelRunStores.Write(target, found as VoxelLayer, captured);
 
             EditorUtility.SetDirty(target);
             AssetDatabase.SaveAssets();

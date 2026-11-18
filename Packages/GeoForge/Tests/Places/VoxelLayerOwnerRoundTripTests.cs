@@ -6,7 +6,6 @@ using Spellbound.Core.Authoring;
 using Spellbound.Places;
 using Spellbound.Places.Owners;
 using Unity.Collections;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Spellbound.GeoForge.Places.Tests {
@@ -123,7 +122,6 @@ namespace Spellbound.GeoForge.Places.Tests {
 
         [Test]
         public void TheParameterlessOwnerWithNoVolumeInTheSceneReportsVolumeMissing() {
-            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var place = CreatePlace(CreateLayer(Vector3Int.one,
                 new VoxelLayerChunk(Vector3Int.zero, CanonicalRuns())));
             var report = new ValidationReport("stamp");
