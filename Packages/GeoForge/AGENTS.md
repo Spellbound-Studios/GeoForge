@@ -55,9 +55,15 @@ Bridge doors in this project, the constructors of the types a bridge assembly ad
   - `static bool Stamp(PlaceDefinition place, IGeoVolume volume, VoxelRegion region, ValidationReport report)`
 <!-- /spellbound:doors -->
 
-<!-- spellbound:operations 776c5a09 -->
+<!-- spellbound:operations 2e6e2718 -->
 com.spellboundstudios.geoforge
 Operations of the group `geoforge`, run as `<group> <operation> [arguments]`:
+- `geoforge bake --target <place-definition> --generator <geo-forge-data-generator> --config <voxel-volume-config> [--layer-name <text> = voxels] [--seed <integer> = 0]`: Fills a voxel layer of a place from a GeoForge density source over the layer's region and writes a report beside the asset. [writes, developer]
+  - `--target`: The place, as asset:<path> or asset:<name>.
+  - `--generator`: The data generator asset the density is read from.
+  - `--config`: The voxel volume config asset giving chunk size and voxel size.
+  - `--layer-name`: The voxel layer's name; added when absent. Default: voxels.
+  - `--seed`: The seed given to the density source. Default: 0.
 - `geoforge capture --target <place-definition> [--layer-name <text> = voxels] [--chunk-x <integer> = 0] [--chunk-y <integer> = 0] [--chunk-z <integer> = 0] [--extent <integer> = 1]`: Captures a region of the open scene's GeoForge volume into a voxel layer of a place. [writes, developer]
   - `--target`: The place, as asset:<path> or asset:<name>.
   - `--layer-name`: The voxel layer's name; added when absent. Default: voxels.

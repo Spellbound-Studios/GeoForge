@@ -6,7 +6,9 @@
     "Spellbound.GeoForge",
     "Spellbound.Places",
     "Spellbound.Core",
-    "Spellbound.Core.Editor"
+    "Spellbound.Core.Editor",
+    "Unity.Collections",
+    "Unity.Entities"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
