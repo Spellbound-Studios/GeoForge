@@ -1,0 +1,25 @@
+{
+  "name": "PlacesConversion",
+  "rootNamespace": "PlacesConversion",
+  "references": ["Spellbound.GeoForge", "Spellbound.GeoForge.Places", "Spellbound.Places", "Spellbound.Core"],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": ["SPELLBOUND_PLACES", "SPELLBOUND_CORE"],
+  "versionDefines": [
+    {
+      "name": "com.spellboundstudios.core",
+      "expression": "[1.1.9,3.0.0)",
+      "define": "SPELLBOUND_CORE"
+    },
+    {
+      "name": "com.spellboundstudios.places",
+      "expression": "[0.0.0,1.0.0)",
+      "define": "SPELLBOUND_PLACES"
+    }
+  ],
+  "noEngineReferences": false
+}
