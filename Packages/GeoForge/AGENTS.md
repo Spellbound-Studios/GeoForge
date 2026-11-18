@@ -55,10 +55,16 @@ Bridge doors in this project, the constructors of the types a bridge assembly ad
   - `static bool Stamp(PlaceDefinition place, IGeoVolume volume, VoxelRegion region, ValidationReport report)`
 <!-- /spellbound:doors -->
 
-<!-- spellbound:operations af92e7d2 -->
+<!-- spellbound:operations 776c5a09 -->
 com.spellboundstudios.geoforge
 Operations of the group `geoforge`, run as `<group> <operation> [arguments]`:
-- none yet
+- `geoforge capture --target <place-definition> [--layer-name <text> = voxels] [--chunk-x <integer> = 0] [--chunk-y <integer> = 0] [--chunk-z <integer> = 0] [--extent <integer> = 1]`: Captures a region of the open scene's GeoForge volume into a voxel layer of a place. [writes, developer]
+  - `--target`: The place, as asset:<path> or asset:<name>.
+  - `--layer-name`: The voxel layer's name; added when absent. Default: voxels.
+  - `--chunk-x`: The region's minimum chunk on x. Default: 0.
+  - `--chunk-y`: The region's minimum chunk on y. Default: 0.
+  - `--chunk-z`: The region's minimum chunk on z. Default: 0.
+  - `--extent`: Chunks per axis of the region. Default: 1.
 <!-- /spellbound:operations -->
 
 <!-- spellbound:pipeline 85aca405 -->
