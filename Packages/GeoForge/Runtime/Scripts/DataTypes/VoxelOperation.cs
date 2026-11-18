@@ -43,9 +43,15 @@ namespace Spellbound.GeoForge {
         public VoxelDensityDelta[] Deltas;
         public uint4 AllowedMaterialsMask;
         public Vector3 WorldPosition;
+        public VoxelEditKind Kind;
 
         public VoxelEditOperation(byte materialIndex, List<VoxelDensityDelta> deltas, uint4 allowedMaterialsMask,
-            Vector3 worldPosition) {
+            Vector3 worldPosition) : this(VoxelEditKind.DensityDelta, materialIndex, deltas, allowedMaterialsMask,
+            worldPosition) { }
+
+        public VoxelEditOperation(VoxelEditKind kind, byte materialIndex, List<VoxelDensityDelta> deltas,
+            uint4 allowedMaterialsMask, Vector3 worldPosition) {
+            Kind = kind;
             MaterialIndex = materialIndex;
             Deltas = deltas.ToArray();
             AllowedMaterialsMask = allowedMaterialsMask;
@@ -53,6 +59,7 @@ namespace Spellbound.GeoForge {
         }
 
         public VoxelEditOperation(byte materialIndex, List<VoxelDensityDelta> deltas, Vector3 worldPosition) {
+            Kind = VoxelEditKind.DensityDelta;
             MaterialIndex = materialIndex;
             Deltas = deltas.ToArray();
             AllowedMaterialsMask = new uint4(uint.MaxValue);
@@ -81,6 +88,7 @@ namespace Spellbound.GeoForge {
 
             Packer.PackArray(ref buffer, Deltas);
             Packer.WriteVector3(ref buffer, WorldPosition);
+            Packer.WriteByte(ref buffer, (byte)Kind);
         }
 
         public void Unpack(ref ReadOnlySpan<byte> buffer) {
@@ -94,11 +102,13 @@ namespace Spellbound.GeoForge {
 
             Deltas = Packer.UnpackArray<VoxelDensityDelta>(ref buffer);
             WorldPosition = Packer.ReadVector3(ref buffer);
+            Kind = (VoxelEditKind)Packer.ReadByte(ref buffer);
         }
 
         public override string ToString() {
-            return $"VoxelEditOperation(MaterialIndex={MaterialIndex}, Deltas={Deltas?.Length ?? 0}, " +
-                   $"Mask=({AllowedMaterialsMask.x},{AllowedMaterialsMask.y},{AllowedMaterialsMask.z},{AllowedMaterialsMask.w})) +" +
+            return $"VoxelEditOperation(Kind={Kind}, MaterialIndex={MaterialIndex}, Deltas={Deltas?.Length ?? 0}, " +
+                   $"Mask=({AllowedMaterialsMask.x},{AllowedMaterialsMask.y}," +
+                   $"{AllowedMaterialsMask.z},{AllowedMaterialsMask.w})) +" +
                    $"WorldPosition=({WorldPosition.x}, {WorldPosition.y},{WorldPosition.z})";
         }
     }

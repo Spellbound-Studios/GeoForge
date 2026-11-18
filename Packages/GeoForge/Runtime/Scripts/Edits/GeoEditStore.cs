@@ -35,6 +35,12 @@ namespace Spellbound.GeoForge {
         }
 
         public void PassVoxelEditOperation(VoxelEditOperation operation) {
+            if (operation.Kind == VoxelEditKind.MaterialPaint) {
+                PaintMaterial(operation);
+
+                return;
+            }
+
             var changes = new List<(int, VoxelData)>(operation.Deltas.Length);
 
             foreach (var voxelDelta in operation.Deltas) {
@@ -93,6 +99,30 @@ namespace Spellbound.GeoForge {
                 // If density didn't actually change (e.g. clamp saturated at the same extreme
                 // despite a nonzero delta), and maturity/material also didn't change, resolved
                 // comes out identical to voxelData - nothing new to write.
+                if (resolved == voxelData)
+                    continue;
+
+                _chunkData.WriteEdit(voxelDelta.Index, resolved);
+                changes.Add((voxelDelta.Index, resolved));
+            }
+
+            NotifyGeoEditsChanged(changes);
+        }
+
+        private void PaintMaterial(VoxelEditOperation operation) {
+            var changes = new List<(int, VoxelData)>(operation.Deltas.Length);
+
+            foreach (var voxelDelta in operation.Deltas) {
+                if (!_chunkData.TryReadEdit(voxelDelta.Index, out var voxelData))
+                    voxelData = geoChunkEngine.GetVoxelData(voxelDelta.Index);
+
+                if (!VoxelEncoding.IsSolid(voxelData.Density) || !operation.IsAllowed(voxelData.GetPlainMatIndex()))
+                    continue;
+
+                var resolved = voxelData.IsMature()
+                    ? VoxelData.CreateMature(voxelData.Density, operation.MaterialIndex)
+                    : VoxelData.CreateImmature(voxelData.Density, operation.MaterialIndex);
+
                 if (resolved == voxelData)
                     continue;
 
