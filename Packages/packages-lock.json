@@ -42,6 +42,13 @@
       "dependencies": {},
       "hash": "5c1fc806e1d2be7d11c2fdd9b50441f3a879b2be"
     },
+    "com.spellboundstudios.places": {
+      "version": "https://github.com/Spellbound-Studios/Places.git?path=/Packages/Places#beta",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "81f505a1cc6bad2792bed94df6d1f1e4197cc655"
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.12",
       "depth": 0,
