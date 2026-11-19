@@ -30,11 +30,11 @@ namespace Spellbound.GeoForge {
         [field: Header("Volume Settings")]
         [field: Tooltip("Config for ChunkSize, VolumeSize, etc")]
         [field: SerializeField]
-        protected VoxelVolumeConfig Config { get; set; }
+        public VoxelVolumeConfig Config { get; set; }
 
         [field: Tooltip("Prefab for the Chunk the Volume will build itself from. Must Implement IGeoChunk")]
         [field: SerializeField]
-        private GameObject ChunkPrefab { get; set; }
+        public GameObject ChunkPrefab { get; set; }
 
         private IDensitySource _pendingDensitySource;
         private IGeoEditStoreSource _editStores = new GeoEditStoreSource();
@@ -44,14 +44,54 @@ namespace Spellbound.GeoForge {
         ///     All IVolumes should create VoxelCoreLogic on Awake.
         /// </summary>
         protected virtual void Awake() {
-            if (ChunkPrefab == null || !ChunkPrefab.TryGetComponent<IGeoChunk>(out _)) {
-                Debug.LogError($"{name}: _chunkPrefab is null or does not have IGeoChunk Component");
-                enabled = false;
-
+            if (GeoVolumeEngine != null || !HasChunkPrefab())
                 return;
-            }
 
             CreateGeoVolume(Config);
+
+            if (GeoVolumeEngine != null)
+                StartCoroutine(InitializeChunks());
+        }
+
+        public GeoForgeManager Manager {
+            get => manager;
+            set => manager = value;
+        }
+
+        public bool Build() {
+            if (GeoVolumeEngine != null)
+                return true;
+
+            if (!HasChunkPrefab())
+                return false;
+
+            if (Config == null || !Config.isFiniteSize) {
+                Log.Error($"{name}: a volume is built at once only over a finite {nameof(VoxelVolumeConfig)}.", this);
+
+                return false;
+            }
+
+            ViewDistanceLodRanges = GeoVolumeEngine.ValidateLodRanges(ViewDistanceLodRanges, Config);
+            CreateGeoVolume(Config);
+
+            if (GeoVolumeEngine == null)
+                return false;
+
+            var initialization = InitializeChunks();
+
+            while (initialization.MoveNext()) { }
+
+            return true;
+        }
+
+        private bool HasChunkPrefab() {
+            if (ChunkPrefab != null && ChunkPrefab.TryGetComponent<IGeoChunk>(out _))
+                return true;
+
+            Debug.LogError($"{name}: _chunkPrefab is null or does not have IGeoChunk Component");
+            enabled = false;
+
+            return false;
         }
 
         /// <summary>
@@ -173,7 +213,6 @@ namespace Spellbound.GeoForge {
 
             GeoVolumeEngine.RegisterVolume();
             OnVolumeRegistered();
-            StartCoroutine(InitializeChunks());
         }
 
         protected virtual void OnAllChunksMeshed() { }
@@ -196,16 +235,19 @@ namespace Spellbound.GeoForge {
 
                 if (!GeoVolumeEngine.RegisterChunk(chunkCoord, chunk)) {
                     Debug.LogError($"{name}: failed to register chunk at {chunkCoord} - duplicate coord?");
-                    Destroy(chunk.GeoChunkEngine.Transform.gameObject);
+                    GeoVolumeEngine.DestroyChunkObject(chunk.GeoChunkEngine.Transform.gameObject);
 
                     yield return null;
 
                     continue;
                 }
 
-                chunk.SetBoundaryOverrides(chunkCoord, GeoVolumeEngine.ConfigBlob, BoundaryOverrides);
-                chunk.SetVoxels(GeoVolumeEngine.CreateFillRequest(chunkCoord),
-                    GeoVolumeEngine.DensitySourceFor(DataGenerator));
+                if (BoundaryOverrides != null)
+                    chunk.SetBoundaryOverrides(chunkCoord, GeoVolumeEngine.ConfigBlob, BoundaryOverrides);
+
+                if (DataGenerator != null || GeoVolumeEngine.DensitySource != null)
+                    chunk.SetVoxels(GeoVolumeEngine.CreateFillRequest(chunkCoord),
+                        GeoVolumeEngine.DensitySourceFor(DataGenerator));
 
                 yield return null;
             }

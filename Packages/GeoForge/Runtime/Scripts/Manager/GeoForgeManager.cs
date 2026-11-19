@@ -69,14 +69,47 @@ namespace Spellbound.GeoForge {
 
         internal BlobAssetReference<McTablesBlobAsset> McTablesBlob { get; private set; }
 
+        public bool HasPendingWork =>
+            _pendingMarchJobData.Count > 0
+            || _pendingTransitionMarchJobData.Count > 0
+            || OctreeBatchTransitionUpdate != null
+            || HasVolumesAwaitingMesh();
+
         private void Awake() {
-            McTablesBlob = MarchTables.Build(Allocator.Persistent);
+            BuildMarchTables();
             _isActive = true;
             ValidateAllVolumesLodsAsync();
         }
 
         private void LateUpdate() {
+            Tick();
+        }
+
+        public void BuildMarchTables() {
+            if (!McTablesBlob.IsCreated)
+                McTablesBlob = MarchTables.Build(Allocator.Persistent);
+        }
+
+        public void Tick() {
+            if (!_isActive && McTablesBlob.IsCreated)
+                ValidateAllVolumesLods();
+
             OctreeBatchTransitionUpdate?.Invoke();
+        }
+
+        public void ReleaseNativeResources() {
+            _isActive = false;
+
+            if (McTablesBlob.IsCreated) {
+                McTablesBlob.Dispose();
+                McTablesBlob = default;
+            }
+
+            DisposeMarchBufferPools();
+            foreach (var kvp in _denseVoxelDataDict)
+                kvp.Value.Dispose();
+
+            _denseVoxelDataDict.Clear();
         }
 
         private void ResolvePresenter() {
@@ -118,14 +151,7 @@ namespace Spellbound.GeoForge {
         }
 
         private void OnDestroy() {
-            _isActive = false;
-
-            if (McTablesBlob.IsCreated)
-                McTablesBlob.Dispose();
-
-            DisposeMarchBufferPools();
-            foreach (var kvp in _denseVoxelDataDict)
-                kvp.Value.Dispose();
+            ReleaseNativeResources();
         }
 
         public bool IsActive() {
@@ -139,7 +165,7 @@ namespace Spellbound.GeoForge {
                 do {
                     var volumeList = new List<IGeoVolume>(_voxelVolumes);
                     foreach (var volume in volumeList) {
-                        if (volume == null || (volume is UnityEngine.Object unityObject && unityObject == null))
+                        if (IsMissing(volume))
                             continue;
                         await volume.ValidateChunkLods();
                     }
@@ -151,6 +177,27 @@ namespace Spellbound.GeoForge {
             finally {
                 Log.Debug($"{nameof(GeoForgeManager)}.{nameof(ValidateAllVolumesLodsAsync)} stopped.");
             }
+        }
+
+        private void ValidateAllVolumesLods() {
+            foreach (var volume in new List<IGeoVolume>(_voxelVolumes)) {
+                if (!IsMissing(volume))
+                    volume.GeoVolumeEngine?.ValidateChunkLods();
+            }
+        }
+
+        private bool HasVolumesAwaitingMesh() {
+            foreach (var volume in _voxelVolumes) {
+                if (!IsMissing(volume) && volume.GeoVolumeEngine != null &&
+                    volume.GeoVolumeEngine.HasChunksAwaitingMesh())
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsMissing(IGeoVolume volume) {
+            return volume == null || (volume is UnityEngine.Object unityObject && unityObject == null);
         }
 
         public void RegisterVoxelVolume(IGeoVolume geoVolume) {

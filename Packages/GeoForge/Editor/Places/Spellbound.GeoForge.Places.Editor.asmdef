@@ -7,6 +7,8 @@
     "Spellbound.Places",
     "Spellbound.Core",
     "Spellbound.Core.Editor",
+    "Spellbound.GeoForge.Editor",
+    "Spellbound.Places.Editor",
     "Unity.Collections",
     "Unity.Entities"
   ],
@@ -16,7 +18,7 @@
   "overrideReferences": false,
   "precompiledReferences": [],
   "autoReferenced": true,
-  "defineConstraints": ["SPELLBOUND_PLACES", "SPELLBOUND_CORE"],
+  "defineConstraints": ["SPELLBOUND_PLACES", "SPELLBOUND_CORE", "!UNITY_SERVER"],
   "versionDefines": [
     {
       "name": "com.spellboundstudios.core",

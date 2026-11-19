@@ -1,14 +1,14 @@
 {
   "name": "Spellbound.GeoForge.Editor",
   "rootNamespace": "Spellbound.GeoForge",
-  "references": ["Spellbound.GeoForge", "Spellbound.Core", "Spellbound.Core.Editor"],
+  "references": ["Spellbound.GeoForge", "Spellbound.GeoForge.Presentation", "Spellbound.Core", "Spellbound.Core.Editor"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": false,
   "precompiledReferences": [],
   "autoReferenced": true,
-  "defineConstraints": ["SPELLBOUND_CORE"],
+  "defineConstraints": ["SPELLBOUND_CORE", "!UNITY_SERVER"],
   "versionDefines": [
     {
       "name": "com.spellboundstudios.core",

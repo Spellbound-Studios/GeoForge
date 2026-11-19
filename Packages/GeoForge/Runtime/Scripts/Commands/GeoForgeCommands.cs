@@ -105,5 +105,21 @@ namespace Spellbound.GeoForge {
         }
 
         #endregion
+
+        public static bool SmoothSphere(IGeoVolume geoVolume, Vector3 worldPosition, float size) {
+            return TerraformSmoothCommand.ExecuteSphere(geoVolume, worldPosition, size);
+        }
+
+        public static bool SmoothCube(IGeoVolume geoVolume, Vector3 worldPosition, int halfExtent) {
+            return TerraformSmoothCommand.ExecuteCube(geoVolume, worldPosition, halfExtent);
+        }
+
+        public static bool PaintSphere(IGeoVolume geoVolume, Vector3 worldPosition, float size, byte material) {
+            return TerraformPaintCommand.ExecuteSphere(geoVolume, worldPosition, size, material);
+        }
+
+        public static bool PaintCube(IGeoVolume geoVolume, Vector3 worldPosition, int halfExtent, byte material) {
+            return TerraformPaintCommand.ExecuteCube(geoVolume, worldPosition, halfExtent, material);
+        }
     }
 }

@@ -178,8 +178,8 @@ namespace Spellbound.GeoForge {
             // never crosses from empty into full and materialIndex is never actually read by the
             // crossing rule downstream for this shape.
             TerraformCommandUtility.DispatchEdits(
-                gfManager, geoVolume, worldPosition, resultMap, 0, allowedMaterialsMask, isFiniteVolume,
-                nameof(TerraformArcCommand));
+                gfManager, geoVolume, worldPosition, resultMap, VoxelEditKind.DensityDelta, 0, allowedMaterialsMask,
+                isFiniteVolume, nameof(TerraformArcCommand));
 
             return true;
         }

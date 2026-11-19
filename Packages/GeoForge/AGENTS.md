@@ -8,7 +8,7 @@ Turns a density field into meshes: octree chunks, marching cubes with Transvoxel
 
 `GeoForgeKit` is the front door. `CreateDensitySource` wraps a `GeoForgeDataGenerator` asset as an `IDensitySource`, and four doors march with no manager, octree or play mode: `Generate` fills one chunk's voxels from a density source, `March` marches them at one level of detail into a `MarchOutput`, `BuildMesh` makes a `Mesh` from that output and `Bake` bakes the mesh for a collider. `VoxelEncoding` is the one place the density and material rules live (the zero rule `IsSolid`, the material encoding with its mature bit, and the null sentinel); `ChunkLayout` gives the data width, voxel index, chunk origin and chunk coordinate.
 
-In a scene a consumer places a `GeoForgeManager` and one or more `GeoVolume`s. The manager is an instance, not a singleton: a volume names its manager in its `manager` field, or finds the one on a parent, and two managers are two worlds that share nothing.
+In a scene a consumer places a `GeoForgeManager` and one or more `GeoVolume`s. The manager is an instance, not a singleton: a volume names its manager in its `manager` field, or finds the one on a parent, and two managers are two worlds that share nothing. In edit mode `ScratchVolume`, in the editor assembly, opens a temporary scene with a manager and one finite volume over a config and a chunk extent, built at once through `GeoVolume.Build`, ticked through `GeoForgeManager.Tick` from the editor's update, drawn by the default presenters it sets by code, finished by `Complete` and closed by `Dispose`.
 
 Four seams, each with a default:
 - `IDensitySource` fills a chunk's voxels; `IGeoVolume.UseDensitySource` sets it, and the default wraps the volume's generator asset.
@@ -18,9 +18,9 @@ Four seams, each with a default:
 
 A manager takes a presenter component on its own object first, then the factory in `ChunkPresenterDefaults`; a presenter set by code wins over both, and setting either slot to null opts the manager out of drawing or of collision.
 
-Edits go through `GeoForgeCommands` (`RemoveSphere`, `AddSphere` and the cube and arc commands) over an `IGeoVolume`; the edit store of a chunk is an `IGeoEditStore`. Queries go through one volume, or through the manager over its primary volumes: `TryQueryVoxel` answers the voxel at a world position, `TryQuerySurfaceMaterial` the material of the cell enclosing it, `TryQuerySurfaceCase` a `SurfaceCase` (the marching cubes cell with its origin, its eight corners in the march's corner order, its case code and whether it is empty, solid or crossed by the surface) and `TryQuerySolid` the zero rule there; `IsMeshReady`, `IsColliderReady` and `IsBoxReady` answer readiness under a `VolumeVersion`, and `TryCopyRunList` and `TryCopySolidRuns` copy a chunk's runs with the version they were read at. `SurfaceCases.Compute` answers surface cases over a chunk's voxel array. A volume raises `Changed` with a `VolumeChange` after an edit and `ResidencyChanged` with a `ChunkResidency`, both after the manager has finished applying a march batch, never inside it, so a subscriber may edit terrain.
+Edits go through `GeoForgeCommands` (`RemoveSphere`, `AddSphere` and the cube and arc commands, the smoothing strokes `SmoothSphere` and `SmoothCube`, which replace each density inside the shape with the mean of its 3 by 3 by 3 neighbourhood, and the paint strokes `PaintSphere` and `PaintCube`, which set the material of solid voxels inside the shape and change no density) over an `IGeoVolume`; the edit store of a chunk is an `IGeoEditStore`. Queries go through one volume, or through the manager over its primary volumes: `TryQueryVoxel` answers the voxel at a world position, `TryQuerySurfaceMaterial` the material of the cell enclosing it, `TryQuerySurfaceCase` a `SurfaceCase` (the marching cubes cell with its origin, its eight corners in the march's corner order, its case code and whether it is empty, solid or crossed by the surface) and `TryQuerySolid` the zero rule there; `IsMeshReady`, `IsColliderReady` and `IsBoxReady` answer readiness under a `VolumeVersion`, and `TryCopyRunList` and `TryCopySolidRuns` copy a chunk's runs with the version they were read at. `SurfaceCases.Compute` answers surface cases over a chunk's voxel array. A volume raises `Changed` with a `VolumeChange` after an edit and `ResidencyChanged` with a `ChunkResidency`, both after the manager has finished applying a march batch, never inside it, so a subscriber may edit terrain.
 
-The Places bridge, `Spellbound.GeoForge.Places`, stamps and captures a Place's voxel layer: `GeoForgePlacesKit.Stamp` and `GeoForgePlacesKit.Capture` take the volume and the region, and a `VoxelLayerOwner` built over a volume and a region goes to `PlacesKit.Stamp` through Places' explicit owner registry; the parameterless `VoxelLayerOwner` that Places registers holds no volume and reports `VolumeMissing`.
+The Places bridge, `Spellbound.GeoForge.Places`, stamps and captures a Place's voxel layer: `GeoForgePlacesKit.Stamp` and `GeoForgePlacesKit.Capture` take the volume and the region, and a `VoxelLayerOwner` built over a volume and a region goes to `PlacesKit.Stamp` through Places' explicit owner registry; the parameterless `VoxelLayerOwner` that Places registers holds no volume and reports `VolumeMissing`. A stamp whose `PlaceStampContext` names a reference frame other than the world is refused before any voxel is written, with `geoforge.voxel-layer-in-reference-frame` at the layer's name, because a GeoForge volume is in the world reference frame. `PlacementsInRockCheck`, the registered `geoforge.placements-in-rock` check in the bridge's editor assembly, classifies a 1.5 m box around each placement point of a Place through a `VoxelLayerOccupancySource` over the Place's first voxel layer and reports `geoforge.inside-rock` when the box is solid. In the editor, `VoxelBrush` applies a `VoxelStroke` (add, remove, smooth or paint, with a sphere or a box) to a volume through `GeoForgeCommands` and keeps its own undo and redo history of the touched chunks' runs, walked by the editor's undo as well, and `VoxelBrushTool` is the scene view tool that strokes where the mouse ray first meets rock. `Edit terrain` on a voxel layer in the Place inspector opens an `EditTerrainSession`, which stamps the layer into a visible scratch volume of its size with the Place's other layers previewed beside it, opens the brush there, and on close runs `PlacementsInRockCheck` on the captured layer: a sealed placement keeps the scene and its strokes open, otherwise the capture is written back into the same layer as one undoable change, and cancel writes nothing. `geoforge layer-edit` applies one stroke to a voxel layer of a revision in the drafts folder with no scene: it first gives the revision its own store beside it, so the approved original's runs never change.
 
 <!-- spellbound:samples 34c4396d -->
 Samples in `Samples~`, imported from the Package Manager's Samples tab:
@@ -55,7 +55,7 @@ Bridge doors in this project, the constructors of the types a bridge assembly ad
   - `static bool Stamp(PlaceDefinition place, IGeoVolume volume, VoxelRegion region, ValidationReport report)`
 <!-- /spellbound:doors -->
 
-<!-- spellbound:operations 2e6e2718 -->
+<!-- spellbound:operations bd1c6c33 -->
 com.spellboundstudios.geoforge
 Operations of the group `geoforge`, run as `<group> <operation> [arguments]`:
 - `geoforge bake --target <place-definition> --generator <geo-forge-data-generator> --config <voxel-volume-config> [--layer-name <text> = voxels] [--seed <integer> = 0]`: Fills a voxel layer of a place from a GeoForge density source over the layer's region and writes a report beside the asset. [writes, developer]
@@ -71,6 +71,16 @@ Operations of the group `geoforge`, run as `<group> <operation> [arguments]`:
   - `--chunk-y`: The region's minimum chunk on y. Default: 0.
   - `--chunk-z`: The region's minimum chunk on z. Default: 0.
   - `--extent`: Chunks per axis of the region. Default: 1.
+- `geoforge layer-edit --target <place-definition> --mode <one of Add, Remove, Smooth, Paint> --shape <one of Sphere, Box> --x <number> --y <number> --z <number> --size <number> [--material <integer> = 0] [--layer-name <text> = voxels]`: Applies one stroke to a voxel layer of a revised place in the drafts folder, with no scene. [writes, developer]
+  - `--target`: The revised place in the drafts folder, as asset:<path> or asset:<name>.
+  - `--mode`: What the stroke does: add, remove, smooth or paint.
+  - `--shape`: The stroke's shape: sphere or box.
+  - `--x`: The stroke's centre on x, in metres from the place's origin.
+  - `--y`: The stroke's centre on y, in metres from the place's origin.
+  - `--z`: The stroke's centre on z, in metres from the place's origin.
+  - `--size`: The sphere's diameter or the box's edge, in metres.
+  - `--material`: The material an add or paint stroke writes. Default: 0.
+  - `--layer-name`: The voxel layer's name. Default: voxels.
 <!-- /spellbound:operations -->
 
 <!-- spellbound:pipeline 85aca405 -->
@@ -96,7 +106,6 @@ The binding rules are the line text at https://github.com/Spellbound-Studios/.gi
 
 ## Gaps
 
-- The default presenters register on entering play mode (`RuntimeInitializeOnLoadMethod`), so a manager driven in edit mode has no default presenter until one is set by code or added as a component.
 - The volume configuration and the marching tables are still blob assets, and the three data factories stay beside the seam that replaces them, until GeoForge Pro leaves the manifests that compile against them.
 - No operation group yet: `core help` lists nothing for GeoForge, and the old console command `TerraformHelpCommand` stays until the old console leaves Core.
 - No `Surface.txt` yet.

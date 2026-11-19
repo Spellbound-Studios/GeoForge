@@ -2,7 +2,9 @@
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Spellbound.Core.Logging;
 using Unity.Collections;
+using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -20,6 +22,8 @@ namespace Spellbound.GeoForge {
         // far away, so the candidate range validated against has to be at least this much wider
         // than the raw shape on every side.
         internal const int PaddingMargin = 3;
+
+        internal static readonly uint4 AllMaterialsMask = new(uint.MaxValue);
 
         #region Job Helpers (Burst-safe)
 
@@ -159,6 +163,46 @@ namespace Spellbound.GeoForge {
             return true;
         }
 
+        internal static bool TryGetManager(IGeoVolume geoVolume, string commandName, out GeoForgeManager manager) {
+            manager = geoVolume.GeoVolumeEngine?.Manager;
+
+            if (manager != null)
+                return true;
+
+            Log.Error($"{commandName}: the volume holds no {nameof(GeoForgeManager)}.");
+
+            return false;
+        }
+
+        internal static void DispatchVoxelDeltas(
+            GeoForgeManager manager,
+            IGeoVolume geoVolume,
+            Vector3 worldPosition,
+            NativeList<int3> voxels,
+            NativeList<short> deltas,
+            VoxelEditKind kind,
+            byte materialIndex,
+            string commandName) {
+            if (voxels.Length == 0)
+                return;
+
+            var resultMap = new NativeParallelMultiHashMap<ChunkCoordKey, VoxelDensityDelta>(
+                voxels.Length * 8, Allocator.TempJob);
+
+            var job = new TerraformVoxelScatterJob {
+                ConfigBlob = geoVolume.ConfigBlob,
+                Voxels = voxels.AsArray(),
+                Deltas = deltas.AsArray(),
+                Writer = resultMap.AsParallelWriter()
+            };
+
+            job.Schedule(voxels.Length, 32).Complete();
+
+            DispatchEdits(
+                manager, geoVolume, worldPosition, resultMap, kind, materialIndex, AllMaterialsMask,
+                geoVolume.ConfigBlob.Value.IsFiniteSize, commandName);
+        }
+
         /// <summary>
         ///     Drains a filled multi-hashmap into one PassVoxelEditOperation call per unique chunk,
         ///     wrapped in GeoForgeManager.BeginEditBatch/EndEditBatch so every affected chunk's march
@@ -170,6 +214,7 @@ namespace Spellbound.GeoForge {
             IGeoVolume geoVolume,
             Vector3 worldPosition,
             NativeParallelMultiHashMap<ChunkCoordKey, VoxelDensityDelta> resultMap,
+            VoxelEditKind kind,
             byte materialIndex,
             uint4 allowedMaterialsMask,
             bool isFiniteVolume,
@@ -219,7 +264,7 @@ namespace Spellbound.GeoForge {
                             } while (resultMap.TryGetNextValue(out delta, ref iterator));
 
                         chunk.PassVoxelEditOperation(
-                            new VoxelEditOperation(materialIndex, deltas, allowedMaterialsMask, worldPosition));
+                            new VoxelEditOperation(kind, materialIndex, deltas, allowedMaterialsMask, worldPosition));
                     }
                 }
                 finally {

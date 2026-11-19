@@ -14,6 +14,8 @@ namespace Spellbound.GeoForge.Places.Tests {
         [TestCase(GeoForgePlacesFindingCodes.RunOutOfRange, "geoforge.run-out-of-range")]
         [TestCase(GeoForgePlacesFindingCodes.VolumeMissing, "geoforge.volume-missing")]
         [TestCase(GeoForgePlacesFindingCodes.ChunkNotLoaded, "geoforge.chunk-not-loaded")]
+        [TestCase(GeoForgePlacesFindingCodes.InsideRock, "geoforge.inside-rock")]
+        [TestCase(GeoForgePlacesFindingCodes.VoxelLayerInReferenceFrame, "geoforge.voxel-layer-in-reference-frame")]
         public void EachCodeReadsAsWritten(string code, string expected) {
             Assert.AreEqual(expected, code);
         }
@@ -25,7 +27,7 @@ namespace Spellbound.GeoForge.Places.Tests {
                 .Select(field => (string)field.GetRawConstantValue())
                 .ToList();
 
-            Assert.AreEqual(5, codes.Count);
+            Assert.AreEqual(7, codes.Count);
             Assert.AreEqual(codes.Count, codes.Distinct().Count());
 
             foreach (var code in codes) {

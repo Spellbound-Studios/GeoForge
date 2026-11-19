@@ -96,8 +96,8 @@ namespace Spellbound.GeoForge {
             job.Schedule(voxelCount, 32).Complete();
 
             TerraformCommandUtility.DispatchEdits(
-                gfManager, geoVolume, worldPosition, resultMap, materialIndex, allowedMaterialsMask, isFiniteVolume,
-                nameof(TerraformCubeCommand));
+                gfManager, geoVolume, worldPosition, resultMap, VoxelEditKind.DensityDelta, materialIndex,
+                allowedMaterialsMask, isFiniteVolume, nameof(TerraformCubeCommand));
 
             return true;
         }

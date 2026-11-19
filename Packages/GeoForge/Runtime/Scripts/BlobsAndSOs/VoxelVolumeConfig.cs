@@ -1,5 +1,6 @@
 // Copyright 2026 Spellbound Studio Inc.
 
+using Spellbound.Core.Logging;
 using Spellbound.Core.Tooling;
 using UnityEngine;
 
@@ -55,7 +56,37 @@ namespace Spellbound.GeoForge {
 
         internal int ChunkSize => chunkSize;
 
+        public static VoxelVolumeConfig Create(int chunkSize, float voxelSize, Vector3Int sizeInChunks) {
+            var config = CreateInstance<VoxelVolumeConfig>();
+            config.maxChunkSize = chunkSize;
+            config.resolution = voxelSize;
+            config.sizeInChunks = sizeInChunks;
+            config.isFiniteSize = true;
+            config.DeriveDimensions();
+
+            return config;
+        }
+
+        public static VoxelVolumeConfig Create(VoxelVolumeConfig source, Vector3Int sizeInChunks) {
+            var config = Instantiate(source);
+            config.sizeInChunks = sizeInChunks;
+            config.isFiniteSize = true;
+            config.DeriveDimensions();
+
+            return config;
+        }
+
         private void OnValidate() {
+            var configuredLevelsOfDetail = levelsOfDetail;
+            DeriveDimensions();
+
+            if (levelsOfDetail != configuredLevelsOfDetail)
+                Log.Emit(LogLevel.Warning,
+                    $"Adjusted levelsOfDetail from {configuredLevelsOfDetail} to {levelsOfDetail} to match " +
+                    $"chunkSize {chunkSize}", this);
+        }
+
+        private void DeriveDimensions() {
             ValidateChunkSize();
             ValidateSizeInChunks();
             ValidateVolumeSize();
@@ -77,12 +108,7 @@ namespace Spellbound.GeoForge {
                 calculatedLod++;
             }
 
-            // Make sure levelsOfDetail matches
-            if (levelsOfDetail != calculatedLod + 1) {
-                Debug.LogWarning(
-                    $"Adjusted levelsOfDetail from {levelsOfDetail} to {calculatedLod + 1} to match chunkSize {chunkSize}");
-                levelsOfDetail = calculatedLod + 1;
-            }
+            levelsOfDetail = calculatedLod + 1;
         }
 
         private void ValidateVolumeSize() {
