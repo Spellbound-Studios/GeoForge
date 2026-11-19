@@ -59,6 +59,14 @@ namespace Spellbound.GeoForge.Tests {
         }
 
         [Test]
+        public void CreateSetsTheDefaultPresenters() {
+            _scratch = ScratchVolume.Create(ChunkSize, VoxelSize, Vector3Int.one, false);
+
+            Assert.That(_scratch.Manager.Presenter, Is.Not.Null);
+            Assert.That(_scratch.Manager.CollisionPresenter, Is.Not.Null);
+        }
+
+        [Test]
         public void DisposeClosesTheSceneAndLeavesNoManager() {
             var managersBefore = Resources.FindObjectsOfTypeAll<GeoForgeManager>().Length;
             _scratch = ScratchVolume.Create(ChunkSize, VoxelSize, Vector3Int.one, false);

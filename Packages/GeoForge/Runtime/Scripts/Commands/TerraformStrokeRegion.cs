@@ -43,11 +43,11 @@ namespace Spellbound.GeoForge {
         }
 
         internal bool TryValidate(
-            IGeoVolume geoVolume, GeoForgeManager gfManager, string commandName, Vector3 worldPosition) {
+            IGeoVolume geoVolume, GeoForgeManager manager, string commandName, Vector3 worldPosition) {
             var paddedHalfExtent = BoundingHalfExtent + TerraformCommandUtility.PaddingMargin;
 
             return TerraformCommandUtility.TryValidateChunkRange(
-                geoVolume, gfManager, CenterVoxel - Vector3Int.one * paddedHalfExtent,
+                geoVolume, manager, CenterVoxel - Vector3Int.one * paddedHalfExtent,
                 CenterVoxel + Vector3Int.one * paddedHalfExtent, commandName, worldPosition, out _, out _);
         }
 
@@ -55,13 +55,13 @@ namespace Spellbound.GeoForge {
             var center = new int3(CenterVoxel.x, CenterVoxel.y, CenterVoxel.z);
             var squaredHalfSize = _sphereHalfSizeVoxels * _sphereHalfSizeVoxels;
 
-            for (var dz = -BoundingHalfExtent; dz <= BoundingHalfExtent; dz++)
-            for (var dy = -BoundingHalfExtent; dy <= BoundingHalfExtent; dy++)
-            for (var dx = -BoundingHalfExtent; dx <= BoundingHalfExtent; dx++) {
-                if (_isSphere && dx * dx + dy * dy + dz * dz > squaredHalfSize)
+            for (var offsetZ = -BoundingHalfExtent; offsetZ <= BoundingHalfExtent; offsetZ++)
+            for (var offsetY = -BoundingHalfExtent; offsetY <= BoundingHalfExtent; offsetY++)
+            for (var offsetX = -BoundingHalfExtent; offsetX <= BoundingHalfExtent; offsetX++) {
+                if (_isSphere && offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ > squaredHalfSize)
                     continue;
 
-                voxels.Add(center + new int3(dx, dy, dz));
+                voxels.Add(center + new int3(offsetX, offsetY, offsetZ));
             }
         }
     }

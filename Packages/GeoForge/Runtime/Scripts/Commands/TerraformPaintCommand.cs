@@ -8,25 +8,25 @@ using UnityEngine;
 namespace Spellbound.GeoForge {
     internal static class TerraformPaintCommand {
         internal static bool ExecuteSphere(IGeoVolume geoVolume, Vector3 worldPosition, float size, byte material) {
-            if (!CanPaint(geoVolume, material, out var gfManager))
+            if (!CanPaint(geoVolume, material, out var manager))
                 return false;
 
             return Execute(
-                gfManager, geoVolume, worldPosition, TerraformStrokeRegion.Sphere(geoVolume, worldPosition, size),
+                manager, geoVolume, worldPosition, TerraformStrokeRegion.Sphere(geoVolume, worldPosition, size),
                 material);
         }
 
         internal static bool ExecuteCube(IGeoVolume geoVolume, Vector3 worldPosition, int halfExtent, byte material) {
-            if (!CanPaint(geoVolume, material, out var gfManager))
+            if (!CanPaint(geoVolume, material, out var manager))
                 return false;
 
             return Execute(
-                gfManager, geoVolume, worldPosition, TerraformStrokeRegion.Cube(geoVolume, worldPosition, halfExtent),
+                manager, geoVolume, worldPosition, TerraformStrokeRegion.Cube(geoVolume, worldPosition, halfExtent),
                 material);
         }
 
-        private static bool CanPaint(IGeoVolume geoVolume, byte material, out GeoForgeManager gfManager) {
-            if (!TerraformCommandUtility.TryGetManager(geoVolume, nameof(TerraformPaintCommand), out gfManager))
+        private static bool CanPaint(IGeoVolume geoVolume, byte material, out GeoForgeManager manager) {
+            if (!TerraformCommandUtility.TryGetManager(geoVolume, nameof(TerraformPaintCommand), out manager))
                 return false;
 
             if (material < VoxelEncoding.NullMaterialIndex)
@@ -39,9 +39,9 @@ namespace Spellbound.GeoForge {
         }
 
         private static bool Execute(
-            GeoForgeManager gfManager, IGeoVolume geoVolume, Vector3 worldPosition, TerraformStrokeRegion region,
+            GeoForgeManager manager, IGeoVolume geoVolume, Vector3 worldPosition, TerraformStrokeRegion region,
             byte material) {
-            if (!region.TryValidate(geoVolume, gfManager, nameof(TerraformPaintCommand), worldPosition))
+            if (!region.TryValidate(geoVolume, manager, nameof(TerraformPaintCommand), worldPosition))
                 return false;
 
             geoVolume.OnTerraform(worldPosition, region.BoundingVoxelCount);
@@ -54,7 +54,7 @@ namespace Spellbound.GeoForge {
                 deltas.Resize(voxels.Length, NativeArrayOptions.ClearMemory);
 
                 TerraformCommandUtility.DispatchVoxelDeltas(
-                    gfManager, geoVolume, worldPosition, voxels, deltas, VoxelEditKind.MaterialPaint, material,
+                    manager, geoVolume, worldPosition, voxels, deltas, VoxelEditKind.MaterialPaint, material,
                     nameof(TerraformPaintCommand));
             }
             finally {

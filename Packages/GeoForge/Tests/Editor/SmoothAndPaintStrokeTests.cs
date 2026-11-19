@@ -62,6 +62,48 @@ namespace Spellbound.GeoForge.Tests {
         }
 
         [Test]
+        public void SmoothSphereOverTwoMaterialsKeepsEachSolidVoxelsMaterial() {
+            var lastRockY = 15;
+            var engine = CreateStepVolume(EdgeInsideOneChunk, lastRockY);
+            var centre = new Vector3Int(EdgeInsideOneChunk, 16, 16);
+            var reach = Mathf.CeilToInt(StrokeSize);
+
+            Assert.That(GeoForgeCommands.SmoothSphere(_scratch.Volume, WorldOfVoxel(engine, centre), StrokeSize),
+                Is.True);
+
+            _scratch.Complete();
+
+            var rockVoxelsRead = 0;
+            var paintVoxelsRead = 0;
+
+            for (var offsetX = -reach; offsetX <= 0; offsetX++)
+            for (var offsetY = -reach; offsetY <= reach; offsetY++)
+            for (var offsetZ = -reach; offsetZ <= reach; offsetZ++) {
+                var offset = new Vector3Int(offsetX, offsetY, offsetZ);
+
+                if (offset.magnitude > StrokeSize)
+                    continue;
+
+                var voxel = centre + offset;
+                var data = ReadVoxel(engine, voxel);
+
+                if (!VoxelEncoding.IsSolid(data.Density))
+                    continue;
+
+                var heldBefore = voxel.y <= lastRockY ? RockMaterial : PaintMaterial;
+                Assert.That(data.GetPlainMatIndex(), Is.EqualTo(heldBefore), $"voxel {voxel}");
+
+                if (heldBefore == RockMaterial)
+                    rockVoxelsRead++;
+                else
+                    paintVoxelsRead++;
+            }
+
+            Assert.That(rockVoxelsRead, Is.GreaterThan(0));
+            Assert.That(paintVoxelsRead, Is.GreaterThan(0));
+        }
+
+        [Test]
         public void SmoothCubeOnAStepEdgeBlendsOnlyInsideTheCube() {
             var engine = CreateStepVolume(EdgeInsideOneChunk);
             var centre = new Vector3Int(EdgeInsideOneChunk, 16, 16);
@@ -84,7 +126,7 @@ namespace Spellbound.GeoForge.Tests {
             var engine = _scratch.Volume.GeoVolumeEngine;
             var firstCoord = LowestChunkCoord(engine);
             var lastOfFirstChunk = new Vector3Int(firstCoord.x * ChunkSize + ChunkSize, 16, 16);
-            FillEveryChunk(engine, lastOfFirstChunk.x);
+            FillEveryChunk(engine, lastOfFirstChunk.x, int.MaxValue);
             var firstOfSecondChunk = lastOfFirstChunk + Vector3Int.right;
 
             Assert.That(
@@ -164,16 +206,20 @@ namespace Spellbound.GeoForge.Tests {
         }
 
         private GeoVolumeEngine CreateStepVolume(int lastSolidX) {
+            return CreateStepVolume(lastSolidX, int.MaxValue);
+        }
+
+        private GeoVolumeEngine CreateStepVolume(int lastSolidX, int lastRockY) {
             _scratch = ScratchVolume.Create(ChunkSize, VoxelSize, Vector3Int.one, false);
             var engine = _scratch.Volume.GeoVolumeEngine;
-            FillEveryChunk(engine, lastSolidX);
+            FillEveryChunk(engine, lastSolidX, lastRockY);
 
             return engine;
         }
 
-        private static void FillEveryChunk(GeoVolumeEngine engine, int lastSolidX) {
+        private static void FillEveryChunk(GeoVolumeEngine engine, int lastSolidX, int lastRockY) {
             foreach (var chunk in engine.ChunkDict.Values)
-                FillStep(chunk, engine, lastSolidX);
+                FillStep(chunk, engine, lastSolidX, lastRockY);
         }
 
         private static Vector3Int LowestChunkCoord(GeoVolumeEngine engine) {
@@ -187,11 +233,12 @@ namespace Spellbound.GeoForge.Tests {
             return lowest;
         }
 
-        private static void FillStep(IGeoChunk chunk, GeoVolumeEngine engine, int lastSolidX) {
+        private static void FillStep(IGeoChunk chunk, GeoVolumeEngine engine, int lastSolidX, int lastRockY) {
             ref var config = ref engine.ConfigBlob.Value;
             var width = config.ChunkDataWidthSize;
             var voxels = new NativeArray<VoxelData>(config.ChunkDataVolumeSize, Allocator.Persistent);
             var originX = chunk.GeoChunkEngine.ChunkCoord.x * config.ChunkSize;
+            var originY = chunk.GeoChunkEngine.ChunkCoord.y * config.ChunkSize;
 
             for (var x = 0; x < width; x++)
             for (var y = 0; y < width; y++)
@@ -199,7 +246,7 @@ namespace Spellbound.GeoForge.Tests {
                 var index = GfStaticHelper.Coord3DToIndex(x, y, z, config.ChunkDataAreaSize, width);
 
                 voxels[index] = originX + x <= lastSolidX
-                    ? VoxelData.CreateImmature(Solid, RockMaterial)
+                    ? VoxelData.CreateImmature(Solid, originY + y <= lastRockY ? RockMaterial : PaintMaterial)
                     : VoxelData.CreateImmature(Empty, VoxelData.NullSentinelValue);
             }
 

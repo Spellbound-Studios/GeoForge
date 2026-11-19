@@ -163,10 +163,10 @@ namespace Spellbound.GeoForge {
             return true;
         }
 
-        internal static bool TryGetManager(IGeoVolume geoVolume, string commandName, out GeoForgeManager gfManager) {
-            gfManager = geoVolume.GeoVolumeEngine?.Manager;
+        internal static bool TryGetManager(IGeoVolume geoVolume, string commandName, out GeoForgeManager manager) {
+            manager = geoVolume.GeoVolumeEngine?.Manager;
 
-            if (gfManager != null)
+            if (manager != null)
                 return true;
 
             Log.Error($"{commandName}: the volume holds no {nameof(GeoForgeManager)}.");
@@ -175,7 +175,7 @@ namespace Spellbound.GeoForge {
         }
 
         internal static void DispatchVoxelDeltas(
-            GeoForgeManager gfManager,
+            GeoForgeManager manager,
             IGeoVolume geoVolume,
             Vector3 worldPosition,
             NativeList<int3> voxels,
@@ -199,7 +199,7 @@ namespace Spellbound.GeoForge {
             job.Schedule(voxels.Length, 32).Complete();
 
             DispatchEdits(
-                gfManager, geoVolume, worldPosition, resultMap, kind, materialIndex, AllMaterialsMask,
+                manager, geoVolume, worldPosition, resultMap, kind, materialIndex, AllMaterialsMask,
                 geoVolume.ConfigBlob.Value.IsFiniteSize, commandName);
         }
 
@@ -209,20 +209,6 @@ namespace Spellbound.GeoForge {
         ///     jobs get scheduled before any of them complete/release. Disposes resultMap and its
         ///     unique-key array itself - callers must not touch resultMap again after calling this.
         /// </summary>
-        internal static void DispatchEdits(
-            GeoForgeManager gfManager,
-            IGeoVolume geoVolume,
-            Vector3 worldPosition,
-            NativeParallelMultiHashMap<ChunkCoordKey, VoxelDensityDelta> resultMap,
-            byte materialIndex,
-            uint4 allowedMaterialsMask,
-            bool isFiniteVolume,
-            string commandName) {
-            DispatchEdits(
-                gfManager, geoVolume, worldPosition, resultMap, VoxelEditKind.DensityDelta, materialIndex,
-                allowedMaterialsMask, isFiniteVolume, commandName);
-        }
-
         internal static void DispatchEdits(
             GeoForgeManager gfManager,
             IGeoVolume geoVolume,

@@ -13,7 +13,6 @@ using Object = UnityEngine.Object;
 namespace Spellbound.GeoForge.EditMode {
     public sealed class ScratchVolume : IDisposable {
         private const string SceneName = "GeoForge Scratch Volume";
-        private const string SizeInChunksField = "sizeInChunks";
         private const string RenderingProfilePath =
             "Packages/com.spellboundstudios.geoforge/Runtime/Defaults/JobAndRenderProfiles/BarycentricProfile.asset";
         private const int DefaultCompletionTickLimit = 2000;
@@ -47,11 +46,8 @@ namespace Spellbound.GeoForge.EditMode {
             if (config == null)
                 throw new ArgumentNullException(nameof(config));
 
-            var sized = Object.Instantiate(config);
+            var sized = VoxelVolumeConfig.Create(config, chunkExtent);
             sized.hideFlags = HideFlags.HideAndDontSave;
-            var serialized = new SerializedObject(sized);
-            serialized.FindProperty(SizeInChunksField).vector3IntValue = chunkExtent;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
 
             return Open(sized, visible);
         }

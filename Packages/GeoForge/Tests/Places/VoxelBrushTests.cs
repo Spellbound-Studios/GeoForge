@@ -73,6 +73,30 @@ namespace Spellbound.GeoForge.Places.Tests {
         }
 
         [Test]
+        public void ARemoveSphereOnAChunkBorderUndoesAndRedoesBothChunks() {
+            var engine = CreateScratch(Solid, new Vector3Int(2, 1, 1));
+            var firstChunk = LowestChunk(engine);
+            var secondChunk = firstChunk + Vector3Int.right;
+            var sharedFace = firstChunk * ChunkSize + new Vector3Int(ChunkSize, Middle.y, Middle.z);
+            var centre = WorldOfVoxel(engine, sharedFace);
+            var firstBefore = RunsOf(engine, firstChunk);
+            var secondBefore = RunsOf(engine, secondChunk);
+
+            Assert.That(_brush.Apply(new VoxelStroke(VoxelStrokeShape.Sphere, VoxelStrokeMode.Remove, centre,
+                CarveSize, RockMaterial)), Is.True);
+            Assert.That(RunsOf(engine, firstChunk), Is.Not.EqualTo(firstBefore));
+            Assert.That(RunsOf(engine, secondChunk), Is.Not.EqualTo(secondBefore));
+
+            Assert.That(_brush.Undo(), Is.True);
+            Assert.That(RunsOf(engine, firstChunk), Is.EqualTo(firstBefore));
+            Assert.That(RunsOf(engine, secondChunk), Is.EqualTo(secondBefore));
+
+            Assert.That(_brush.Redo(), Is.True);
+            Assert.That(RunsOf(engine, firstChunk), Is.Not.EqualTo(firstBefore));
+            Assert.That(RunsOf(engine, secondChunk), Is.Not.EqualTo(secondBefore));
+        }
+
+        [Test]
         public void UnitysUndoAndRedoWalkTheBrushHistory() {
             var engine = CreateScratch(Solid);
             var centre = WorldOfVoxel(engine, Middle);
@@ -202,7 +226,11 @@ namespace Spellbound.GeoForge.Places.Tests {
         }
 
         private GeoVolumeEngine CreateScratch(int lastSolidX) {
-            _scratch = ScratchVolume.Create(ChunkSize, VoxelSize, Vector3Int.one, false);
+            return CreateScratch(lastSolidX, Vector3Int.one);
+        }
+
+        private GeoVolumeEngine CreateScratch(int lastSolidX, Vector3Int chunkExtent) {
+            _scratch = ScratchVolume.Create(ChunkSize, VoxelSize, chunkExtent, false);
             var engine = _scratch.Volume.GeoVolumeEngine;
 
             foreach (var chunk in engine.ChunkDict.Values) {
@@ -210,9 +238,19 @@ namespace Spellbound.GeoForge.Places.Tests {
             }
 
             _scratch.Complete();
-            _brush = new VoxelBrush(_scratch.Volume, new VoxelRegion(Vector3Int.zero, Vector3Int.one));
+            _brush = new VoxelBrush(_scratch.Volume, new VoxelRegion(LowestChunk(engine), chunkExtent));
 
             return engine;
+        }
+
+        private static Vector3Int LowestChunk(GeoVolumeEngine engine) {
+            var lowest = Vector3Int.one * int.MaxValue;
+
+            foreach (var coordinate in engine.ChunkDict.Keys) {
+                lowest = Vector3Int.Min(lowest, coordinate);
+            }
+
+            return lowest;
         }
 
         private static void FillStep(IGeoChunk chunk, GeoVolumeEngine engine, int lastSolidX) {

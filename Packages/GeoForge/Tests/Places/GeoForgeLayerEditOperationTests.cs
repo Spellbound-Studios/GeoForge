@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using NUnit.Framework;
@@ -19,9 +20,13 @@ namespace Spellbound.GeoForge.Places.Tests {
         private const int ChunkSize = 32;
         private const string LayerName = "voxels";
         private const sbyte Solid = sbyte.MaxValue;
-        private const string RemoveAtTheCentre = " --mode remove --shape sphere --x 16 --y 16 --z 16 --size 8";
 
         private static readonly Vector3 Centre = Vector3.one * (ChunkSize / 2f);
+
+        private static readonly string AtTheCentre =
+            string.Format(CultureInfo.InvariantCulture, " --x {0} --y {1} --z {2}", Centre.x, Centre.y, Centre.z);
+
+        private static readonly string RemoveAtTheCentre = " --mode remove --shape sphere" + AtTheCentre + " --size 8";
 
         private GeoForgePlacesTestFolder _folder;
         private bool _draftsFolderExisted;
@@ -135,9 +140,11 @@ namespace Spellbound.GeoForge.Places.Tests {
             var revisionPath = Revise(CreatePlace("Unknown"));
 
             var result = Run("geoforge layer-edit --target asset:" + revisionPath
-                + " --mode melt --shape sphere --x 16 --y 16 --z 16 --size 8");
+                + " --mode melt --shape sphere" + AtTheCentre + " --size 8");
 
-            Assert.That(result.Succeeded, Is.False, result.Text);
+            Assert.That(result.Status, Is.EqualTo(OperationStatus.Invalid), result.Text);
+            StringAssert.StartsWith("invalid:", result.Text);
+            StringAssert.Contains("melt", result.Text);
             Assert.That(File.Exists(StorePath(revisionPath)), Is.False);
         }
 

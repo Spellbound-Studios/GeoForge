@@ -129,7 +129,7 @@ namespace Spellbound.GeoForge.Places.Tests {
         }
 
         [Test]
-        public void TheOtherLayersAreStampedUnderARootInTheScratchScene() {
+        public void ThePreviewRootLivesInTheScratchScene() {
             var place = CreatePlace("Previewed", LayerOfSolidRows(DataWidth()));
 
             _session = EditTerrainSession.Open(place, 0);

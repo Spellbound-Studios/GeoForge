@@ -67,6 +67,15 @@ namespace Spellbound.GeoForge {
             return config;
         }
 
+        public static VoxelVolumeConfig Create(VoxelVolumeConfig source, Vector3Int sizeInChunks) {
+            var config = Instantiate(source);
+            config.sizeInChunks = sizeInChunks;
+            config.isFiniteSize = true;
+            config.DeriveDimensions();
+
+            return config;
+        }
+
         private void OnValidate() {
             var configuredLevelsOfDetail = levelsOfDetail;
             DeriveDimensions();

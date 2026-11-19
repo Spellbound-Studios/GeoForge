@@ -70,15 +70,22 @@ namespace Spellbound.GeoForge.Places {
             _overlay = new VoxelBrushOverlay(this);
             SceneView.AddOverlayToActiveView(_overlay);
             _overlay.displayed = true;
+            AssemblyReloadEvents.beforeAssemblyReload += DisposeOwnedBrush;
         }
 
         public override void OnWillBeDeactivated() {
+            AssemblyReloadEvents.beforeAssemblyReload -= DisposeOwnedBrush;
+
             if (_overlay != null) {
                 SceneView.RemoveOverlayFromActiveView(_overlay);
                 _overlay = null;
             }
 
             _isStroking = false;
+            DisposeOwnedBrush();
+        }
+
+        private void DisposeOwnedBrush() {
             _ownedBrush?.Dispose();
             _ownedBrush = null;
         }

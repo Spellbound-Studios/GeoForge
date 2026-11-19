@@ -41,6 +41,28 @@ namespace Spellbound.GeoForge.Tests {
             }
         }
 
+        [Test]
+        public void CopiedConfigKeepsTheSourceSettingsWithTheGivenExtent() {
+            var source = VoxelVolumeConfig.Create(64, 0.5f, new Vector3Int(1, 1, 1));
+            var extent = new Vector3Int(2, 3, 1);
+            var copy = VoxelVolumeConfig.Create(source, extent);
+
+            try {
+                Assert.That(copy, Is.Not.SameAs(source));
+                Assert.That(copy.chunkSize, Is.EqualTo(source.chunkSize));
+                Assert.That(copy.levelsOfDetail, Is.EqualTo(source.levelsOfDetail));
+                Assert.That(copy.resolution, Is.EqualTo(source.resolution));
+                Assert.That(copy.sizeInChunks, Is.EqualTo(extent));
+                Assert.That(copy.isFiniteSize, Is.True);
+                Assert.That(copy.volumeSize, Is.EqualTo((Vector3)extent * source.chunkSize * source.resolution));
+                Assert.That(source.sizeInChunks, Is.EqualTo(Vector3Int.one));
+            }
+            finally {
+                Object.DestroyImmediate(copy);
+                Object.DestroyImmediate(source);
+            }
+        }
+
         private static VoxelVolumeConfig ValidatedAsset(int chunkSize, float voxelSize, Vector3Int sizeInChunks) {
             var asset = ScriptableObject.CreateInstance<VoxelVolumeConfig>();
             var serialized = new SerializedObject(asset);

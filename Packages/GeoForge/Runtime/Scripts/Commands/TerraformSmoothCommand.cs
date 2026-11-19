@@ -10,24 +10,24 @@ namespace Spellbound.GeoForge {
         private const float NeighbourhoodVoxelCount = 27f;
 
         internal static bool ExecuteSphere(IGeoVolume geoVolume, Vector3 worldPosition, float size) {
-            if (!TerraformCommandUtility.TryGetManager(geoVolume, nameof(TerraformSmoothCommand), out var gfManager))
+            if (!TerraformCommandUtility.TryGetManager(geoVolume, nameof(TerraformSmoothCommand), out var manager))
                 return false;
 
             return Execute(
-                gfManager, geoVolume, worldPosition, TerraformStrokeRegion.Sphere(geoVolume, worldPosition, size));
+                manager, geoVolume, worldPosition, TerraformStrokeRegion.Sphere(geoVolume, worldPosition, size));
         }
 
         internal static bool ExecuteCube(IGeoVolume geoVolume, Vector3 worldPosition, int halfExtent) {
-            if (!TerraformCommandUtility.TryGetManager(geoVolume, nameof(TerraformSmoothCommand), out var gfManager))
+            if (!TerraformCommandUtility.TryGetManager(geoVolume, nameof(TerraformSmoothCommand), out var manager))
                 return false;
 
             return Execute(
-                gfManager, geoVolume, worldPosition, TerraformStrokeRegion.Cube(geoVolume, worldPosition, halfExtent));
+                manager, geoVolume, worldPosition, TerraformStrokeRegion.Cube(geoVolume, worldPosition, halfExtent));
         }
 
         private static bool Execute(
-            GeoForgeManager gfManager, IGeoVolume geoVolume, Vector3 worldPosition, TerraformStrokeRegion region) {
-            if (!region.TryValidate(geoVolume, gfManager, nameof(TerraformSmoothCommand), worldPosition))
+            GeoForgeManager manager, IGeoVolume geoVolume, Vector3 worldPosition, TerraformStrokeRegion region) {
+            if (!region.TryValidate(geoVolume, manager, nameof(TerraformSmoothCommand), worldPosition))
                 return false;
 
             geoVolume.OnTerraform(worldPosition, region.BoundingVoxelCount);
@@ -43,7 +43,7 @@ namespace Spellbound.GeoForge {
                 CollectSmoothingDeltas(geoVolume, voxels, smoothedVoxels, deltas, solidMaterialCounts);
 
                 TerraformCommandUtility.DispatchVoxelDeltas(
-                    gfManager, geoVolume, worldPosition, smoothedVoxels, deltas, VoxelEditKind.DensityDelta,
+                    manager, geoVolume, worldPosition, smoothedVoxels, deltas, VoxelEditKind.DensityDelta,
                     MostCommonMaterial(solidMaterialCounts), nameof(TerraformSmoothCommand));
             }
             finally {
@@ -75,11 +75,11 @@ namespace Spellbound.GeoForge {
                 var local = voxel - chunkCoord * chunkSize;
                 var densitySum = 0;
 
-                for (var dz = -NeighbourhoodRadius; dz <= NeighbourhoodRadius; dz++)
-                for (var dy = -NeighbourhoodRadius; dy <= NeighbourhoodRadius; dy++)
-                for (var dx = -NeighbourhoodRadius; dx <= NeighbourhoodRadius; dx++) {
+                for (var offsetZ = -NeighbourhoodRadius; offsetZ <= NeighbourhoodRadius; offsetZ++)
+                for (var offsetY = -NeighbourhoodRadius; offsetY <= NeighbourhoodRadius; offsetY++)
+                for (var offsetX = -NeighbourhoodRadius; offsetX <= NeighbourhoodRadius; offsetX++) {
                     var neighbourIndex = GfStaticHelper.Coord3DToIndex(
-                        local.x + dx, local.y + dy, local.z + dz, areaSize, widthSize);
+                        local.x + offsetX, local.y + offsetY, local.z + offsetZ, areaSize, widthSize);
 
                     store.TryRead(neighbourIndex, out var neighbour);
                     densitySum += neighbour.Density;
